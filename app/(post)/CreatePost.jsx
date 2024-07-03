@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Image, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { View, Image, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
 import { Text, TextInput, Button } from 'react-native-paper';
 import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +11,7 @@ const CreatePostScreen = () => {
   const [newPostText, setNewPostText] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [updateTrigger, setUpdateTrigger] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
   const router = useRouter();
 
   const addPost = async () => {
@@ -27,7 +28,7 @@ const CreatePostScreen = () => {
       };
   
       try {
-        await axios.post('http://192.168.1.97:3000/create-post', newPost);
+        await axios.post('https://primate-big-alpaca.ngrok-free.app/create-post', newPost);
         setUpdateTrigger(prev => !prev);
       } catch (error) {
         console.error('Failed to save post on server', error);
@@ -43,10 +44,10 @@ const CreatePostScreen = () => {
       if (response && !response.didCancel && !response.error && response.assets && response.assets.length > 0) {
         const localUri = response.assets[0].uri;
   
-        // Преобразование file:// в http:// для iOS
         let imageUrl = localUri;
         if (Platform.OS === 'ios' && localUri.startsWith('file://')) {
           try {
+            setImageLoading(true);
             const formData = new FormData();
             formData.append('image', {
               uri: localUri,
@@ -54,20 +55,23 @@ const CreatePostScreen = () => {
               name: response.assets[0].fileName
             });
   
-            const uploadResponse = await axios.post('http://192.168.1.97:3000/upload-image', formData, {
+            const uploadResponse = await axios.post('https://primate-big-alpaca.ngrok-free.app/upload-image', formData, {
               headers: {
                 'Content-Type': 'multipart/form-data'
               }
             });
   
-            imageUrl = uploadResponse.data.url; // Получаем URL изображения с сервера
+            imageUrl = uploadResponse.data.url;
           } catch (error) {
             console.error('Failed to upload image to server:', error);
+            setImageLoading(false);
             return;
+          } finally {
+            setImageLoading(false);
           }
         }
   
-        setSelectedImage(imageUrl); // Устанавливаем ссылку в state
+        setSelectedImage(imageUrl);
       }
     });
   };
@@ -90,49 +94,58 @@ const CreatePostScreen = () => {
       marginBottom: 20,
       fontWeight: 'bold',
       textAlign: 'center',
+      color: '#333333',
     },
     input: {
       backgroundColor: '#F0F0F0',
       marginBottom: 20,
       paddingHorizontal: 20,
-      paddingVertical: 2,
+      paddingVertical: 12,
       borderRadius: 10,
-      elevation: 3,
       fontSize: 18,
     },
     imagePickerButton: {
-      backgroundColor: '#D3D3D3',
+      backgroundColor: '#A9A9A9',
       borderRadius: 10,
       elevation: 2,
       marginBottom: 20,
+      paddingVertical: 12,
     },
     imagePickerButtonText: {
       textTransform: 'uppercase',
       fontWeight: 'bold',
-      color: '#333333',
+      color: '#FFFFFF',
+      textAlign: 'center',
     },
     selectedImage: {
       width: '100%',
-      height: 200,
+      height: 400,
       marginBottom: 20,
       borderRadius: 12,
       overflow: 'hidden',
     },
     addButton: {
-      backgroundColor: '#A9A9A9',
+      backgroundColor: '#333333',
       borderRadius: 10,
       elevation: 2,
+      paddingVertical: 12,
     },
     addButtonText: {
       textTransform: 'uppercase',
       fontWeight: 'bold',
       color: '#FFFFFF',
+      textAlign: 'center',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
   });
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <Text style={styles.header}>Создать Пост</Text>
         <TextInput
           mode="flat"
@@ -151,12 +164,19 @@ const CreatePostScreen = () => {
         >
           Выбрать изображение
         </Button>
-        {selectedImage && <Image source={{ uri: selectedImage }} style={styles.selectedImage} />}
+        {imageLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#333333" />
+          </View>
+        ) : selectedImage ? (
+          <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
+        ) : null}
         <Button
           mode="contained"
           onPress={addPost}
           style={styles.addButton}
           labelStyle={styles.addButtonText}
+          disabled={imageLoading || (!newPostText.trim() && !selectedImage)}
         >
           Добавить пост
         </Button>

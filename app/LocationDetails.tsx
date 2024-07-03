@@ -61,7 +61,7 @@ export default function LocationDetailsScreen() {
             const user = await AsyncStorage.getItem('@user');
             if (user) {
               const userId = JSON.parse(user).id;
-              await axios.post('http://192.168.1.97:3000/save-payment-method', {
+              await axios.post('https://primate-big-alpaca.ngrok-free.app/save-payment-method', {
                 userId,
                 paymentMethodId,
               });
@@ -138,12 +138,12 @@ export default function LocationDetailsScreen() {
           const userId = JSON.parse(user).id;
 
           // Check user's coin balance
-          const coinsResponse = await axios.get(`http://192.168.1.97:3000/coins/${userId}`);
+          const coinsResponse = await axios.get(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`);
           const currentCoins = coinsResponse.data.coins;
 
           if (currentCoins >= 100) {
             // Deduct coins from user's account
-            await axios.post(`http://192.168.1.97:3000/coins/${userId}`, {
+            await axios.post(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`, {
               coins: currentCoins - 100
             });
 

@@ -62,7 +62,7 @@ export default function Index() {
 
     const logRegistration = async (user) => {
         try {
-            await fetch('http://192.168.1.97:3000/log-registration', {
+            await fetch('https://primate-big-alpaca.ngrok-free.app/log-registration', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -124,7 +124,7 @@ export default function Index() {
 
     const fetchCoins = async (userId) => {
         try {
-            const response = await fetch(`http://192.168.1.97:3000/coins/${userId}`);
+            const response = await fetch(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`);
             const data = await response.json();
             setCoins(data.coins);
         } catch (error) {
