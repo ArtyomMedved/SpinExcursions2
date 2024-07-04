@@ -140,7 +140,7 @@ export default function Index() {
         <SafeAreaView style={styles.container}>
             <View style={styles.coinContainer}>
                 <Ionicons name="star" size={24} color="#4285F4" />
-                <Text style={styles.coinText}>Coins: {coins}</Text>
+                <Text style={styles.coinText}>{coins}</Text>
             </View>
             {!userInfo ? (
                 <View style={styles.card}>

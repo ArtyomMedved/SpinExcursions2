@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, Text, Image, Alert } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Text, Image, Alert, Button } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Modal from 'react-native-modal';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -19,35 +20,13 @@ const MapScreen = () => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({});
+  const [isUserRegistered, setIsUserRegistered] = useState(false);
   const navigation = useNavigation();
   const mapRef = useRef(null);
 
   useEffect(() => {
     (async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setErrorMsg('Permission to access location was denied');
-          return;
-        }
-
-        let location = await Location.getCurrentPositionAsync({});
-        setLocation(location);
-
-        Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 1000,
-            distanceInterval: 1,
-          },
-          (newLocation) => {
-            setLocation(newLocation);
-          }
-        );
-      } catch (error) {
-        console.error('Error while requesting location permissions or getting location', error);
-        setErrorMsg('Error while requesting location permissions or getting location');
-      }
+      await checkUserRegistration();
     })();
   }, []);
 
@@ -62,6 +41,37 @@ const MapScreen = () => {
       Alert.alert('Location Error', errorMsg);
     }
   }, [errorMsg]);
+
+  const checkUserRegistration = async () => {
+    const user = await getLocalUser();
+    setIsUserRegistered(!!user);
+    if (!user) return;
+
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setLocation(location);
+
+      Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 1000,
+          distanceInterval: 1,
+        },
+        (newLocation) => {
+          setLocation(newLocation);
+        }
+      );
+    } catch (error) {
+      console.error('Error while requesting location permissions or getting location', error);
+      setErrorMsg('Error while requesting location permissions or getting location');
+    }
+  };
 
   const fetchWeather = async (latitude, longitude) => {
     try {
@@ -139,6 +149,16 @@ const MapScreen = () => {
     }
   ];
 
+  if (!isUserRegistered) {
+    return (
+      <View style={styles.notRegisteredContainer}>
+        <Text style={styles.notRegisteredText}>У вас нет аккаунта</Text>
+        <Text style={styles.notRegisteredText}>Пожалуйста, пройдите регистрацию</Text>
+        <Button title='Обновить' onPress={checkUserRegistration} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <MapView
@@ -176,7 +196,7 @@ const MapScreen = () => {
       {weather && (
         <View style={styles.weatherContainer}>
           <Text style={styles.weatherText}>{weather.name}</Text>
-          <Text style={styles.weatherTemp}>{`${weather.main.temp}°C`}</Text>
+          <Text style={styles.weatherText}>{weather ? `${weather.main.temp}°C` : 'Загрузка...'}</Text>
           <Image
             source={{
               uri: `https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`,
@@ -196,6 +216,12 @@ const MapScreen = () => {
       </Modal>
     </View>
   );
+};
+
+const getLocalUser = async () => {
+  const data = await AsyncStorage.getItem("@user");
+  if (!data) return null;
+  return JSON.parse(data);
 };
 
 const styles = StyleSheet.create({
@@ -244,41 +270,52 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: 'white',
     padding: 20,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  borderRadius: 10,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  modalStreet: {
-    fontSize: 16,
-    color: 'gray',
-    marginBottom: 20,
-  },
-  moreInfoButton: {
-    backgroundColor: 'blue',
-    padding: 10,
-    borderRadius: 20,
-    alignItems: 'center',
-  },
-  moreInfoButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  markerImage: {
-    width: 30,
-    height: 30,
-    resizeMode: 'contain',
-  },
+  shadowOpacity: 0.25,
+  shadowRadius: 3.84,
+  elevation: 5,
+},
+modalTitle: {
+  fontSize: 20,
+  fontWeight: 'bold',
+  marginBottom: 10,
+},
+modalStreet: {
+  fontSize: 16,
+  color: 'gray',
+  marginBottom: 20,
+},
+moreInfoButton: {
+  backgroundColor: 'blue',
+  padding: 10,
+  borderRadius: 20,
+  alignItems: 'center',
+},
+moreInfoButtonText: {
+  color: 'white',
+  fontSize: 16,
+},
+markerImage: {
+  width: 30,
+  height: 30,
+  resizeMode: 'contain',
+},
+notRegisteredContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'white',
+},
+notRegisteredText: {
+  fontSize: 18,
+  color: 'black',
+  textAlign: 'center',
+},
 });
 
 export default MapScreen;

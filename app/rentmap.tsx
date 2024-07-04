@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, Text, Alert } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Text, Alert, Image } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import Modal from 'react-native-modal';
 import * as Location from 'expo-location';
@@ -9,7 +9,7 @@ import MapViewDirections from 'react-native-maps-directions';
 import uuid from 'uuid-js';
 
 const SECRET_KEY = 'test_AuJsuu_1Akmyg3Vzy7DCq-ob_jhDlAR-jqiIZep0ViY';
-const SHOP_ID = '401474';  // Замените 'your_shop_id' на ваш реальный магазин ID
+const SHOP_ID = '401474';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -22,6 +22,7 @@ const GOOGLE_MAPS_APIKEY = 'AIzaSyChiFJsHXD6u1ymneTtBMFC5JlYs_sX6hY';
 const MapScreen = () => {
   const [location, setLocation] = useState(null);
   const [weather, setWeather] = useState(null);
+  const [weatherIcon, setWeatherIcon] = useState(null); // Состояние для иконки погоды
   const [errorMsg, setErrorMsg] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({});
@@ -31,6 +32,7 @@ const MapScreen = () => {
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
   const [isRouteVisible, setIsRouteVisible] = useState(false);
+  const [routeDuration, setRouteDuration] = useState(null); // Новое состояние для времени маршрута
   const navigation = useNavigation();
   const mapRef = useRef(null);
 
@@ -109,6 +111,7 @@ const MapScreen = () => {
     },
   ];
 
+
   useEffect(() => {
     (async () => {
       try {
@@ -141,6 +144,10 @@ const MapScreen = () => {
   useEffect(() => {
     if (location) {
       fetchWeather(location.coords.latitude, location.coords.longitude);
+      setOrigin({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
     }
   }, [location]);
 
@@ -167,6 +174,13 @@ const MapScreen = () => {
         `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric`
       );
       setWeather(response.data);
+      
+      // Получаем ссылку на иконку из данных погоды и обновляем состояние
+      if (response.data.weather && response.data.weather.length > 0) {
+        const iconCode = response.data.weather[0].icon;
+        const iconUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
+        setWeatherIcon(iconUrl);
+      }
     } catch (error) {
       console.error('Error fetching weather data', error);
       Alert.alert('Error', 'Failed to fetch weather data. Please check your API key.');
@@ -219,7 +233,7 @@ const MapScreen = () => {
         const { routes } = response.data;
         if (routes.length > 0) {
           const { legs } = routes[0];
-          const { start_location, end_location } = legs[0];
+          const { start_location, end_location, duration } = legs[0]; // Получаем информацию о времени маршрута
           setOrigin({
             latitude: start_location.lat,
             longitude: start_location.lng,
@@ -228,12 +242,13 @@ const MapScreen = () => {
             latitude: end_location.lat,
             longitude: end_location.lng,
           });
+          setRouteDuration(duration.text); // Сохраняем время маршрута в состояние
           setIsRouteVisible(true);
         } else {
           Alert.alert('Route Error', 'No pedestrian route found.');
         }
       } else {
-        Alert.alert('Route Error', 'Failed to fetch pedestrian route.');
+        Alert.alert('Route Error', `Failed to fetch pedestrian route: ${response.data.error_message}`);
       }
     } catch (error) {
       console.error('Error fetching route data', error);
@@ -327,9 +342,12 @@ const MapScreen = () => {
             origin={origin}
             destination={destination}
             apikey={GOOGLE_MAPS_APIKEY}
-            strokeWidth={2}
-            strokeColor="blue"
+            strokeWidth={4}
+            strokeColor="white"
             mode='WALKING'
+            onReady={(result) => {
+              setRouteDuration(result.duration); // Обновляем состояние с временем маршрута
+            }}
           />
         )}
       </MapView>
@@ -338,15 +356,18 @@ const MapScreen = () => {
         <Text style={styles.locationButtonText}>Где я?</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.generateRouteButton} onPress={generatePedestrianRoute}>
-        <Text style={styles.generateRouteButtonText}>Построить маршрут</Text>
-      </TouchableOpacity>
-
-      <View style={styles.weatherContainer}>
-        <Text style={styles.weatherText}>
-          Погода {weather ? `${weather.main.temp}°C` : 'Загрузка...'}
-        </Text>
-      </View>
+      {weather && (
+        <View style={styles.weatherContainer}>
+          <Text style={styles.weatherText}>{weather.name}</Text>
+          <Text style={styles.weatherText}>{weather ? `${weather.main.temp}°C` : 'Загрузка...'}</Text>
+          <Image
+            source={{
+              uri: `https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`,
+            }}
+            style={styles.weatherIcon}
+          />
+        </View>
+      )}
 
       <View style={styles.earningsContainer}>
         <Text style={styles.earningsText}>Сумма: {earnings} рублей</Text>
@@ -355,6 +376,13 @@ const MapScreen = () => {
           <Text style={styles.finishButtonText}>Завершить поездку</Text>
         </TouchableOpacity>
       </View>
+
+      {routeDuration && (
+        <View style={styles.routeDurationContainer}>
+          <Text style={styles.routeDurationText}>Время маршрута:</Text>
+          <Text style={styles.routeDurationText}>{routeDuration.toFixed(2)} минут</Text>
+        </View>
+      )}
 
       <Modal isVisible={showConfirmation}>
         <View style={styles.confirmationContainer}>
@@ -384,7 +412,7 @@ const styles = StyleSheet.create({
   },
   locationButton: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 60,
     right: 20,
     backgroundColor: 'blue',
     padding: 10,
@@ -394,28 +422,23 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  generateRouteButton: {
-    position: 'absolute',
-    bottom: 40,
-    right: 20,
-    backgroundColor: 'green',
-    padding: 10,
-    borderRadius: 20,
-  },
-  generateRouteButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
   weatherContainer: {
     position: 'absolute',
-    top: 50,
-    right: 20,
-    backgroundColor: 'white',
-    padding: 10,
+    top: 35,
+    right: 0,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    padding: 6,
     borderRadius: 10,
+    alignItems: 'center',
   },
   weatherText: {
     fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  weatherIcon: {
+    width: 60,
+    height: 60,
   },
   earningsContainer: {
     position: 'absolute',
@@ -444,6 +467,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  routeDurationContainer: {
+    position: 'absolute',
+    top: 40,
+    left: 5,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    padding: 10,
+    borderRadius: 10,
+  },
+  routeDurationText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   confirmationContainer: {
     backgroundColor: 'white',
     padding: 20,
@@ -463,7 +498,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'green',
     padding: 10,
     borderRadius: 10,
-    marginRight: 10,
   },
   confirmButtonText: {
     color: 'white',

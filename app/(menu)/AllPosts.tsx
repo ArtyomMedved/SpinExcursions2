@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, Image, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
-import { Card, Text, IconButton } from 'react-native-paper';
+import { View, FlatList, Image, StyleSheet, SafeAreaView, ActivityIndicator, Text, Button } from 'react-native';
+import { Card, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Post = ({ post, onLike, onDislike }) => {
@@ -36,7 +36,7 @@ const Post = ({ post, onLike, onDislike }) => {
             color={post.liked ? 'blue' : 'grey'}
             size={24}
             onPress={handleLike}
-            disabled={post.liked || post.loading} // Отключаем кнопку лайка, если уже лайкнут или идет загрузка
+            disabled={post.liked || post.loading}
           />
           <Text>{post.likes}</Text>
           <IconButton
@@ -44,7 +44,7 @@ const Post = ({ post, onLike, onDislike }) => {
             color={post.disliked ? 'red' : 'grey'}
             size={24}
             onPress={handleDislike}
-            disabled={post.disliked || post.loading} // Отключаем кнопку дизлайка, если уже дизлайкнут или идет загрузка
+            disabled={post.disliked || post.loading}
           />
           <Text>{post.dislikes}</Text>
           {post.loading && <ActivityIndicator size="small" color="#0000ff" />}
@@ -58,7 +58,14 @@ const AllPostsScreen = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [likedPosts, setLikedPosts] = useState(new Set());
-  const [dislikedPosts, setDislikedPosts] = useState(new Set()); // Множество для отслеживания дизлайкнутых постов
+  const [dislikedPosts, setDislikedPosts] = useState(new Set());
+  const [isUserRegistered, setIsUserRegistered] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      await checkUserRegistration();
+    })();
+  }, []);
 
   useEffect(() => {
     const loadPosts = async () => {
@@ -71,7 +78,7 @@ const AllPostsScreen = () => {
         setPosts(data.map(post => ({
           ...post,
           liked: likedPosts.has(post.id),
-          disliked: dislikedPosts.has(post.id), // Устанавливаем флаг дизлайка
+          disliked: dislikedPosts.has(post.id),
           loading: false,
         })));
         setLoading(false);
@@ -82,7 +89,12 @@ const AllPostsScreen = () => {
     };
 
     loadPosts();
-  }, [likedPosts, dislikedPosts]); // Зависимость от likedPosts и dislikedPosts
+  }, [likedPosts, dislikedPosts]);
+
+  const checkUserRegistration = async () => {
+    const user = await getLocalUser();
+    setIsUserRegistered(!!user);
+  };
 
   const handleLike = async (postId) => {
     try {
@@ -136,18 +148,15 @@ const AllPostsScreen = () => {
     }
   };
 
-  const updatePostInList = async (updatedPost) => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setPosts(prevPosts =>
-        prevPosts.map(post =>
-          post.id === updatedPost.id ? updatedPost : post
-        )
-      );
-    } catch (error) {
-      console.error('Error updating post in list:', error);
-    }
-  };
+  if (!isUserRegistered) {
+    return (
+      <View style={styles.notRegisteredContainer}>
+        <Text style={styles.notRegisteredText}>У вас нет аккаунта</Text>
+        <Text style={styles.notRegisteredText}>Пожалуйста, пройдите регистрацию</Text>
+        <Button title='Обновить' onPress={checkUserRegistration} />
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -174,6 +183,12 @@ const AllPostsScreen = () => {
   );
 };
 
+const getLocalUser = async () => {
+  const data = await AsyncStorage.getItem("@user");
+  if (!data) return null;
+  return JSON.parse(data);
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -186,7 +201,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'visible',
     elevation: 2,
-    width: '100%', // Adjust width as needed
+    width: '100%',
   },
   cardContentWrapper: {
     overflow: 'hidden',
@@ -226,6 +241,16 @@ const styles = StyleSheet.create({
   postActions: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  notRegisteredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+  },
+  notRegisteredText: {
+    fontSize: 18,
+    textAlign: 'center',
   },
 });
 
