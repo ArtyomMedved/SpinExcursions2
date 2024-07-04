@@ -6,7 +6,8 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import WelcomeScreen from "@/components/WelcomeScreen";
-import { FontAwesome, Ionicons } from "@expo/vector-icons";  // Импортируем Ionicons
+import { FontAwesome, Ionicons } from "@expo/vector-icons";  // Import Ionicons
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -16,6 +17,7 @@ export default function Index() {
     const [isFirstLaunch, setIsFirstLaunch] = useState(true);
     const [loadingAppleSignIn, setLoadingAppleSignIn] = useState(false); 
     const [coins, setCoins] = useState(0);
+    const [isLoading, setIsLoading] = useState(true);  // New state for managing the loading phase
 
     const [request, response, promptAsync] = Google.useAuthRequest({
         androidClientId: "264256222540-or7nbototcrpji70jlmag9semhklg942.apps.googleusercontent.com",
@@ -32,6 +34,14 @@ export default function Index() {
             fetchCoins(userInfo.id);
         }
     }, [userInfo]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 2000); // Show loading animation for 3 seconds
+
+        return () => clearTimeout(timer);
+    }, []);
 
     const checkFirstLaunch = async () => {
         const hasLaunched = await AsyncStorage.getItem("hasLaunched");
@@ -132,6 +142,14 @@ export default function Index() {
         }
     };
 
+    if (isLoading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <LoadingAnimation />
+            </View>
+        );  // Show loading animation first
+    }
+
     if (isFirstLaunch) {
         return <WelcomeScreen onDismiss={() => setIsFirstLaunch(false)} />;
     }
@@ -182,7 +200,7 @@ export default function Index() {
                         onPress={async () => {
                             await AsyncStorage.removeItem("@user");
                             setUserInfo(null);
-                            setCoins(0); // Сбрасываем количество коинов
+                            setCoins(0); // Reset coin count
                         }}>
                         <Text style={styles.buttonText}>Выйти из аккаунта</Text>
                     </TouchableOpacity>
@@ -334,4 +352,11 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff', // Solid background color
+  },
 });
+
