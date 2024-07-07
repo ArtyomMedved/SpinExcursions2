@@ -7,6 +7,9 @@ import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import MapViewDirections from 'react-native-maps-directions';
 import uuid from 'uuid-js';
+import { FontAwesome6 } from '@expo/vector-icons';
+import * as Speech from 'expo-speech';
+
 
 const SECRET_KEY = 'test_AuJsuu_1Akmyg3Vzy7DCq-ob_jhDlAR-jqiIZep0ViY';
 const SHOP_ID = '401474';
@@ -16,13 +19,14 @@ const ASPECT_RATIO = width / height;
 const LATITUDE_DELTA = 0.0422;
 const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
 
-const OPENWEATHER_API_KEY = 'a1d3e04065ee9b6bbf351467362cfdf5';
+const OPENWEATHER_API_KEY = 'bccc694fbb70ff0d0782aa792ee610da';
 const GOOGLE_MAPS_APIKEY = 'AIzaSyChiFJsHXD6u1ymneTtBMFC5JlYs_sX6hY';
 
 const MapScreen = () => {
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [location, setLocation] = useState(null);
   const [weather, setWeather] = useState(null);
-  const [weatherIcon, setWeatherIcon] = useState(null); // Состояние для иконки погоды
+  const [weatherIcon, setWeatherIcon] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({});
@@ -32,7 +36,16 @@ const MapScreen = () => {
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
   const [isRouteVisible, setIsRouteVisible] = useState(false);
-  const [routeDuration, setRouteDuration] = useState(null); // Новое состояние для времени маршрута
+  const [routeDuration, setRouteDuration] = useState(null);
+  const [isMapTypeModalVisible, setMapTypeModalVisible] = useState(false);
+  const [currentMapType, setCurrentMapType] = useState('standard');
+  const [mapTypes] = useState([
+    { label: 'Обычная', value: 'standard' },
+    { label: 'Гибрид', value: 'hybrid' },
+    { label: 'Спутник', value: 'satellite' },
+  ]);
+  const [isNavigating, setIsNavigating] = useState(false);
+
   const navigation = useNavigation();
   const mapRef = useRef(null);
 
@@ -111,7 +124,6 @@ const MapScreen = () => {
     },
   ];
 
-
   useEffect(() => {
     (async () => {
       try {
@@ -132,6 +144,12 @@ const MapScreen = () => {
           },
           (newLocation) => {
             setLocation(newLocation);
+            if (isNavigating && newLocation.coords.latitude && newLocation.coords.longitude) {
+              setOrigin({
+                latitude: newLocation.coords.latitude,
+                longitude: newLocation.coords.longitude,
+              });
+            }
           }
         );
       } catch (error) {
@@ -168,14 +186,36 @@ const MapScreen = () => {
     return () => clearInterval(timerInterval);
   }, [timer]);
 
+  useEffect(() => {
+    if (routeDuration && !isSpeaking) {
+      setIsSpeaking(true);
+      Speech.speak(`До конца маршрута ${routeDuration} минут`);
+    }
+  }, [routeDuration]);
+
+  useEffect(() => {
+    if (isRouteVisible && !isNavigating) {
+      setIsNavigating(true);
+      Speech.speak(`Вы приехали`);
+    }
+  }, [isRouteVisible]);
+
+  useEffect(() => {
+    const speakingTimer = setTimeout(() => {
+      setIsSpeaking(false);
+    }, 3000); // Задержка в миллисекундах до сброса состояния
+  
+    return () => clearTimeout(speakingTimer);
+  }, [isSpeaking]);
+  
+
   const fetchWeather = async (latitude, longitude) => {
     try {
       const response = await axios.get(
         `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric`
       );
       setWeather(response.data);
-      
-      // Получаем ссылку на иконку из данных погоды и обновляем состояние
+
       if (response.data.weather && response.data.weather.length > 0) {
         const iconCode = response.data.weather[0].icon;
         const iconUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
@@ -198,7 +238,31 @@ const MapScreen = () => {
       longitude: location.coordinates.longitude,
     });
     setIsRouteVisible(true);
-    toggleModal();
+  
+    // Подстройка зума
+    if (mapRef.current && location && origin) {
+      mapRef.current.fitToCoordinates(
+        [
+          {
+            latitude: origin.latitude,
+            longitude: origin.longitude,
+          },
+          {
+            latitude: location.coordinates.latitude,
+            longitude: location.coordinates.longitude,
+          },
+        ],
+        {
+          edgePadding: {
+            top: 50,
+            right: 50,
+            bottom: 50,
+            left: 50,
+          },
+          animated: true,
+        }
+      );
+    }
   };
 
   const goToCurrentLocation = () => {
@@ -233,7 +297,7 @@ const MapScreen = () => {
         const { routes } = response.data;
         if (routes.length > 0) {
           const { legs } = routes[0];
-          const { start_location, end_location, duration } = legs[0]; // Получаем информацию о времени маршрута
+          const { start_location, end_location, duration } = legs[0];
           setOrigin({
             latitude: start_location.lat,
             longitude: start_location.lng,
@@ -242,13 +306,13 @@ const MapScreen = () => {
             latitude: end_location.lat,
             longitude: end_location.lng,
           });
-          setRouteDuration(duration.text); // Сохраняем время маршрута в состояние
+          setRouteDuration(duration.text);
           setIsRouteVisible(true);
         } else {
           Alert.alert('Route Error', 'No pedestrian route found.');
         }
       } else {
-        Alert.alert('Route Error', `Failed to fetch pedestrian route: ${response.data.error_message}`);
+          Alert.alert('Route Error', `Failed to fetch pedestrian route: ${response.data.error_message}`);
       }
     } catch (error) {
       console.error('Error fetching route data', error);
@@ -263,7 +327,7 @@ const MapScreen = () => {
   const confirmFinishTrip = async () => {
     setShowConfirmation(false);
     try {
-      const idempotenceKey = uuid.create().toString(); // Генерируем новый UUID
+      const idempotenceKey = uuid.create().toString();
 
       const response = await axios.post('https://api.yookassa.ru/v3/payments', {
         amount: {
@@ -272,7 +336,7 @@ const MapScreen = () => {
         },
         confirmation: {
           type: 'redirect',
-          return_url: 'spinexapp://home', // Убедитесь, что это deep link вашего приложения
+          return_url: 'spinexapp://home',
         },
         capture: true,
         description: 'Оплата поездки',
@@ -288,15 +352,13 @@ const MapScreen = () => {
       });
 
       console.log('Payment response:', response.data);
-      const paymentUrl = response.data.confirmation.confirmation_url; // Это URL для переадресации, если нужно
+      const paymentUrl = response.data.confirmation.confirmation_url;
 
-      // После успешного платежа можно выполнить дополнительные действия
-      // Например, переход на другой экран
       navigation.push('PaymentWebView', { url: paymentUrl });
 
     } catch (error) {
-      console.error('Ошибка при оплате', error);
-      Alert.alert('Ошибка', 'Не удалось завершить оплату. Попробуйте еще раз.');
+      console.error('Payment Error', error);
+      Alert.alert('Payment Error', 'Failed to complete payment. Please try again.');
     }
   };
 
@@ -311,14 +373,23 @@ const MapScreen = () => {
     return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const toggleMapTypeModal = () => {
+    setMapTypeModalVisible(!isMapTypeModalVisible);
+  };
+
+  const handleMapTypeSelect = (value) => {
+    setCurrentMapType(value);
+    setMapTypeModalVisible(false);
+  };
+
   return (
     <View style={styles.container}>
       <MapView
         ref={mapRef}
         style={styles.map}
-        initialRegion={{
-          latitude: 55.732399,
-          longitude: 52.454630,
+        region={{
+          latitude: location?.coords.latitude || 37.78825,
+          longitude: location?.coords.longitude || -122.4324,
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LONGITUDE_DELTA,
         }}
@@ -327,13 +398,15 @@ const MapScreen = () => {
         scrollEnabled={true}
         pitchEnabled={true}
         rotateEnabled={true}
-        mapType="satellite"
+        mapType={currentMapType}
+        showsCompass={true}
       >
-        {attractions.map((attraction) => (
+        {attractions.map((attraction, index) => (
           <Marker
-            key={attraction.id}
+            key={index}
             coordinate={attraction.coordinates}
-            title={attraction.title}
+            title={attraction.title} // исправлено на title
+            description={attraction.description} // добавлено для наглядности
             onPress={() => handleMarkerPress(attraction)}
           />
         ))}
@@ -343,50 +416,67 @@ const MapScreen = () => {
             destination={destination}
             apikey={GOOGLE_MAPS_APIKEY}
             strokeWidth={4}
-            strokeColor="white"
-            mode='WALKING'
+            strokeColor="blue"
+            mode="WALKING"
             onReady={(result) => {
-              setRouteDuration(result.duration); // Обновляем состояние с временем маршрута
+              const roundedDuration = Math.round(result.duration);
+              setRouteDuration(roundedDuration);
+              mapRef.current.fitToCoordinates(result.coordinates, {
+                edgePadding: {
+                  right: 20,
+                  bottom: 20,
+                  left: 20,
+                  top: 20,
+                },
+              });
             }}
           />
         )}
       </MapView>
-
-      <TouchableOpacity style={styles.locationButton} onPress={goToCurrentLocation}>
-        <Text style={styles.locationButtonText}>Где я?</Text>
-      </TouchableOpacity>
-
+  
       {weather && (
         <View style={styles.weatherContainer}>
-          <Text style={styles.weatherText}>{weather.name}</Text>
-          <Text style={styles.weatherText}>{weather ? `${weather.main.temp}°C` : 'Загрузка...'}</Text>
-          <Image
-            source={{
-              uri: `https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`,
-            }}
-            style={styles.weatherIcon}
-          />
+          <Text style={styles.weatherText}>{`${weather.main.temp}°C`}</Text>
+          {weatherIcon && <Image source={{ uri: weatherIcon }} style={styles.weatherIcon} />}
+          <Text style={styles.weatherText}>{weather.weather[0].description}</Text>
         </View>
       )}
-
-      <View style={styles.earningsContainer}>
-        <Text style={styles.earningsText}>Сумма: {earnings} рублей</Text>
-        <Text style={styles.timerText}>{formatTime(timer)}</Text>
-        <TouchableOpacity style={styles.finishButton} onPress={finishTrip}>
-          <Text style={styles.finishButtonText}>Завершить поездку</Text>
-        </TouchableOpacity>
+  
+      <TouchableOpacity style={styles.buttonCenter} onPress={goToCurrentLocation}>
+        <FontAwesome6 name="location-crosshairs" size={24} color="black" />
+      </TouchableOpacity>
+  
+      <TouchableOpacity style={styles.buttonRandomRoute} onPress={generatePedestrianRoute}>
+        <Text style={styles.buttonText}>Случайный маршрут</Text>
+      </TouchableOpacity>
+  
+      <TouchableOpacity style={styles.buttonMapType} onPress={toggleMapTypeModal}>
+        <Text style={styles.buttonTextMapType}>Выбрать тип карты</Text>
+      </TouchableOpacity>
+  
+      <TouchableOpacity style={styles.buttonFinishTrip} onPress={finishTrip}>
+        <Text style={styles.buttonText}>Завершить поездку</Text>
+      </TouchableOpacity>
+  
+      <View style={styles.infoContainer}>
+        <Text style={styles.infoText}>Время: {formatTime(timer)}</Text>
+        <Text style={styles.infoText}>Заработок: {earnings}₽</Text>
+        {routeDuration && <Text style={styles.infoText}>маршрут: {routeDuration} мин.</Text>}
       </View>
-
-      {routeDuration && (
-        <View style={styles.routeDurationContainer}>
-          <Text style={styles.routeDurationText}>Время маршрута:</Text>
-          <Text style={styles.routeDurationText}>{routeDuration.toFixed(2)} минут</Text>
+  
+      <Modal isVisible={isModalVisible}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>{selectedLocation.title}</Text> {/* исправлено на title */}
+          <Text style={styles.modalDescription}>{selectedLocation.description}</Text> {/* добавлено для наглядности */}
+          <TouchableOpacity style={styles.modalButton} onPress={toggleModal}>
+            <Text style={styles.modalButtonText}>Закрыть</Text>
+          </TouchableOpacity>
         </View>
-      )}
-
+      </Modal>
+  
       <Modal isVisible={showConfirmation}>
-        <View style={styles.confirmationContainer}>
-          <Text style={styles.confirmationText}>Завершить поездку и оплатить {earnings} рублей?</Text>
+        <View style={styles.confirmationModalContent}>
+          <Text style={styles.confirmationTitle}>Завершить поездку?</Text>
           <View style={styles.confirmationButtons}>
             <TouchableOpacity style={styles.confirmButton} onPress={confirmFinishTrip}>
               <Text style={styles.confirmButtonText}>Да</Text>
@@ -397,6 +487,16 @@ const MapScreen = () => {
           </View>
         </View>
       </Modal>
+  
+      <Modal isVisible={isMapTypeModalVisible}>
+        <View style={styles.mapTypeModalContent}>
+          {mapTypes.map((type) => (
+            <TouchableOpacity key={type.value} style={styles.mapTypeButton} onPress={() => handleMapTypeSelect(type.value)}>
+              <Text style={styles.mapTypeButtonText}>{type.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -405,113 +505,193 @@ const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
-    alignItems: 'center',
+    backgroundColor: '#f0f0f0', // Цвет фона контейнера
   },
   map: {
     ...StyleSheet.absoluteFillObject,
   },
-  locationButton: {
+  buttonCenter: {
     position: 'absolute',
-    bottom: 60,
-    right: 20,
-    backgroundColor: 'blue',
-    padding: 10,
-    borderRadius: 20,
+    bottom: 30,
+    right: 30,
+    backgroundColor: 'white', // Синий цвет
+    paddingVertical: 10, // Увеличено для большего пространства внутри кнопки
+    paddingHorizontal: 10, // Увеличено для большего пространства внутри кнопки
+    borderRadius: 10,
+    marginVertical: 8, // Увеличено расстояние между кнопками
+    elevation: 3, // Тень для приподнятого эффекта
   },
-  locationButtonText: {
+  buttonRandomRoute: {
+    position: 'absolute',
+    bottom: 80,
+    right: 30,
+    backgroundColor: '#007AFF', // Синий цвет
+    paddingVertical: 12, // Увеличено для большего пространства внутри кнопки
+    paddingHorizontal: 20, // Увеличено для большего пространства внутри кнопки
+    borderRadius: 8,
+    marginVertical: 8, // Увеличено расстояние между кнопками
+    elevation: 3, // Тень для приподнятого эффекта
+  },
+  buttonMapType: {
+    position: 'absolute',
+    top: 40,
+    left: 10,
+    backgroundColor: 'blue',
+    borderRadius: 10,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  buttonTextMapType: {
     color: 'white',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  buttonFinishTrip: {
+    position: 'absolute',
+    bottom: 30,
+    left: 20,
+    backgroundColor: '#FF3B30', // Красный цвет
+    paddingVertical: 12, // Увеличено для большего пространства внутри кнопки
+    paddingHorizontal: 20, // Увеличено для большего пространства внутри кнопки
+    borderRadius: 8,
+    marginVertical: 8, // Увеличено расстояние между кнопками
+    elevation: 3, // Тень для приподнятого эффекта
+  },
+  infoContainer: {
+    position: 'absolute',
+    bottom: 90,
+    left: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Легкий прозрачный белый цвет
+    borderRadius: 10,
+    padding: 12, // Увеличено для большего пространства внутри контейнера
+    elevation: 3, // Тень для приподнятого эффекта
+  },
+  infoText: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#333333', // Цвет текста
   },
   weatherContainer: {
     position: 'absolute',
     top: 35,
-    right: 0,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    padding: 6,
-    borderRadius: 10,
+    right: 10, // Немного сдвинуто вправо для лучшего выравнивания
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Легкий прозрачный белый цвет
+    padding: 10,
+    borderRadius: 8,
     alignItems: 'center',
+    elevation: 3, // Тень для приподнятого эффекта
   },
   weatherText: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
+    color: '#333333', // Цвет текста
   },
   weatherIcon: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
   },
-  earningsContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 5,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    padding: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  earningsText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  timerText: {
-    fontSize: 16,
-    marginTop: 5,
-  },
-  finishButton: {
-    marginTop: 10,
-    backgroundColor: 'red',
-    padding: 10,
-    borderRadius: 10,
-  },
-  finishButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  routeDurationContainer: {
-    position: 'absolute',
-    top: 40,
-    left: 5,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    padding: 10,
-    borderRadius: 10,
-  },
-  routeDurationText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  confirmationContainer: {
-    backgroundColor: 'white',
+  modalContent: {
+    backgroundColor: '#FFFFFF', // Белый цвет
     padding: 20,
     borderRadius: 10,
     alignItems: 'center',
+    elevation: 4, // Более выраженная тень для модального окна
   },
-  confirmationText: {
+  modalTitle: {
     fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333333', // Цвет текста
+  },
+  modalDescription: {
+    fontSize: 16,
     marginBottom: 20,
+    color: '#666666', // Цвет текста
+  },
+  modalButton: {
+    backgroundColor: '#007AFF', // Синий цвет
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    elevation: 3, // Тень для приподнятого эффекта
+  },
+  modalButtonText: {
+    color: '#FFFFFF', // Цвет текста
+    fontSize: 16,
+  },
+  confirmationModalContent: {
+    backgroundColor: '#FFFFFF', // Белый цвет
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    elevation: 4, // Более выраженная тень для модального окна
+  },
+  confirmationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333333', // Цвет текста
   },
   confirmationButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '80%',
+    marginTop: 20,
   },
   confirmButton: {
-    backgroundColor: 'green',
-    padding: 10,
-    borderRadius: 10,
+    backgroundColor: '#4CD964', // Зеленый цвет
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 5,
+    elevation: 3, // Тень для приподнятого эффекта
   },
   confirmButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#FFFFFF', // Цвет текста
+    fontSize: 16,
   },
   cancelButton: {
-    backgroundColor: 'red',
-    padding: 10,
-    borderRadius: 10,
+    backgroundColor: '#FF3B30', // Красный цвет
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 5,
+    elevation: 3, // Тень для приподнятого эффекта
   },
   cancelButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#FFFFFF', // Цвет текста
+    fontSize: 16,
   },
+  mapTypeModalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  mapTypeButton: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  mapTypeButtonText: {
+    color: 'black', // Цвет текста
+    fontSize: 16,
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 14,
+  }
 });
 
 export default MapScreen;
