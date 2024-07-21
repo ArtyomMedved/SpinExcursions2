@@ -10,7 +10,6 @@ import uuid from 'uuid-js';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 
-
 const SECRET_KEY = 'test_AuJsuu_1Akmyg3Vzy7DCq-ob_jhDlAR-jqiIZep0ViY';
 const SHOP_ID = '401474';
 
@@ -19,7 +18,7 @@ const ASPECT_RATIO = width / height;
 const LATITUDE_DELTA = 0.0422;
 const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
 
-const OPENWEATHER_API_KEY = 'bccc694fbb70ff0d0782aa792ee610da';
+const OPENWEATHER_API_KEY = '6b7a73fe2a292c1f37575e933cf65015';
 const GOOGLE_MAPS_APIKEY = 'AIzaSyChiFJsHXD6u1ymneTtBMFC5JlYs_sX6hY';
 
 const MapScreen = () => {
@@ -161,7 +160,6 @@ const MapScreen = () => {
 
   useEffect(() => {
     if (location) {
-      fetchWeather(location.coords.latitude, location.coords.longitude);
       setOrigin({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -203,7 +201,7 @@ const MapScreen = () => {
   useEffect(() => {
     const speakingTimer = setTimeout(() => {
       setIsSpeaking(false);
-    }, 3000); // Задержка в миллисекундах до сброса состояния
+    }, 1000); // Задержка в миллисекундах до сброса состояния
   
     return () => clearTimeout(speakingTimer);
   }, [isSpeaking]);
@@ -238,31 +236,6 @@ const MapScreen = () => {
       longitude: location.coordinates.longitude,
     });
     setIsRouteVisible(true);
-  
-    // Подстройка зума
-    if (mapRef.current && location && origin) {
-      mapRef.current.fitToCoordinates(
-        [
-          {
-            latitude: origin.latitude,
-            longitude: origin.longitude,
-          },
-          {
-            latitude: location.coordinates.latitude,
-            longitude: location.coordinates.longitude,
-          },
-        ],
-        {
-          edgePadding: {
-            top: 50,
-            right: 50,
-            bottom: 50,
-            left: 50,
-          },
-          animated: true,
-        }
-      );
-    }
   };
 
   const goToCurrentLocation = () => {
@@ -274,7 +247,7 @@ const MapScreen = () => {
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LONGITUDE_DELTA,
         },
-        1000
+        5000
       );
     }
   };
@@ -417,18 +390,10 @@ const MapScreen = () => {
             apikey={GOOGLE_MAPS_APIKEY}
             strokeWidth={4}
             strokeColor="blue"
-            mode="WALKING"
+            mode='WALKING'
             onReady={(result) => {
               const roundedDuration = Math.round(result.duration);
               setRouteDuration(roundedDuration);
-              mapRef.current.fitToCoordinates(result.coordinates, {
-                edgePadding: {
-                  right: 20,
-                  bottom: 20,
-                  left: 20,
-                  top: 20,
-                },
-              });
             }}
           />
         )}
