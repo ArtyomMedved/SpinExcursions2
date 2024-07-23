@@ -210,13 +210,6 @@ export default function Index() {
                         onPress={() => router.push("/CreatePost")}>
                         <Text style={styles.buttonText}>Сделать пост</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={resetFirstLaunch}
-                    >
-                        <Text style={styles.buttonText}>Сбросить первый запуск</Text>
-                    </TouchableOpacity>
                 </View>
             )}
         </SafeAreaView>
