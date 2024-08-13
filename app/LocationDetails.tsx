@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Button, Image, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Button, Image, Alert, Platform, useColorScheme } from 'react-native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -7,7 +7,7 @@ import uuid from 'uuid-js';
 import urlParse from 'url-parse';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import PushNotification from 'react-native-push-notification';
-import PushNotificationIOS from '@react-native-community/push-notification-ios'; // Импортируем библиотеку уведомлений для iOS
+import PushNotificationIOS from '@react-native-community/push-notification-ios';
 import { Linking } from 'react-native';
 
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3/payments';
@@ -22,15 +22,16 @@ export default function LocationDetailsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [paymentId, setPaymentId] = useState(null);
 
+  const colorScheme = useColorScheme();
+
   const scooters = [
-    { id: '1', name: 'Scooter 1', image: require('../assets/scooter.png') },
-    { id: '2', name: 'Scooter 2', image: require('../assets/scooter.png') },
-    { id: '3', name: 'Scooter 3', image: require('../assets/scooter.png') },
-    { id: '4', name: 'Scooter 4', image: require('../assets/scooter.png') },
+    { id: '1', name: 'Самокат 0001', image: require('../assets/scooter.png') },
+    { id: '2', name: 'Самокат 0002', image: require('../assets/scooter.png') },
+    { id: '3', name: 'Самокат 0003', image: require('../assets/scooter.png') },
+    { id: '4', name: 'Самокат 0004', image: require('../assets/scooter.png') },
   ];
 
   useEffect(() => {
-    // Push notification configuration
     PushNotification.configure({
       onNotification: function (notification) {
         console.log('LOCAL NOTIFICATION ==>', notification);
@@ -39,7 +40,6 @@ export default function LocationDetailsScreen() {
       requestPermissions: Platform.OS === 'ios'
     });
 
-    // Deep linking handler
     const handleDeepLink = async (event) => {
       try {
         const parsedUrl = urlParse(event.url, true);
@@ -53,11 +53,10 @@ export default function LocationDetailsScreen() {
             },
           });
 
-          console.log('Payment info response:', paymentInfo.data);
-
           const paymentMethodId = paymentInfo.data.payment_method ? paymentInfo.data.payment_method.id : null;
 
           if (paymentMethodId) {
+            await AsyncStorage.setItem('@paymentMethodId', paymentMethodId);
             const user = await AsyncStorage.getItem('@user');
             if (user) {
               const userId = JSON.parse(user).id;
@@ -90,7 +89,7 @@ export default function LocationDetailsScreen() {
     return () => {
       linkingEventListener.remove();
     };
-  }, [navigation, paymentId, selectedScooter]);
+  }, [navigation, paymentId]);
 
   const handleScooterPress = (scooter) => {
     setSelectedScooter(scooter);
@@ -111,7 +110,7 @@ export default function LocationDetailsScreen() {
           return_url: 'spinexapp://callback'
         },
         capture: true,
-        description: `Rent ${selectedScooter.name}`,
+        description: `Rent ${title}/${selectedScooter.name}`,
         save_payment_method: true,
       }, {
         auth: {
@@ -127,7 +126,7 @@ export default function LocationDetailsScreen() {
       console.log('Payment creation response:', response.data);
 
       const paymentUrl = response.data.confirmation.confirmation_url;
-      const paymentId = response.data.id; // Save payment id for later use
+      const paymentId = response.data.id;
       setPaymentId(paymentId);
 
       setModalVisible(false);
@@ -137,17 +136,14 @@ export default function LocationDetailsScreen() {
         if (user) {
           const userId = JSON.parse(user).id;
 
-          // Check user's coin balance
           const coinsResponse = await axios.get(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`);
           const currentCoins = coinsResponse.data.coins;
 
           if (currentCoins >= 100) {
-            // Deduct coins from user's account
             await axios.post(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`, {
               coins: currentCoins - 100
             });
 
-            // Notify user and navigate to rentmap
             Alert.alert('Оплата', 'Оплата прошла успешно, с вашего счета было списано 100 коинов');
             navigation.push('rentmap');
           } else {
@@ -157,7 +153,6 @@ export default function LocationDetailsScreen() {
           console.warn('User not found in local storage');
         }
       } else {
-        // Navigate to YooKassa payment webview
         navigation.push('PaymentWebView', { url: paymentUrl });
       }
     } catch (error) {
@@ -175,12 +170,17 @@ export default function LocationDetailsScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+    <View style={[styles.container, colorScheme === 'dark' && styles.darkContainer]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colorScheme === 'dark' ? "#f3f6f4" : "#333"} />
+        </TouchableOpacity>
+        <Text style={[styles.title, colorScheme === 'dark' && styles.darktitle]}>{title}</Text>
+      </View>
       <Text style={styles.street}>{street}</Text>
       <Text style={styles.description}>{description}</Text>
       <View style={styles.scooters}>
-        <Text style={styles.sectionTitle}>Scooter List</Text>
+        <Text style={[styles.sectionTitle, colorScheme === 'dark' && styles.darksectionTitle]}>Scooter List</Text>
         <FlatList
           data={scooters}
           renderItem={renderItem}
@@ -197,7 +197,7 @@ export default function LocationDetailsScreen() {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>You selected {selectedScooter.name}</Text>
+              <Text style={styles.modalTitle}>Вы выбрали: {selectedScooter.name}</Text>
               <Image source={selectedScooter.image} style={styles.modalImage} />
               <Button title="Арендовать" onPress={() => handleRentPress(false)} color="#4CAF50" />
               <Button title="Арендовать коинами (100)" onPress={() => handleRentPress(true)} color="#4CAF50" />
@@ -216,10 +216,27 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#F5F5F5',
   },
+  darkContainer: {
+    backgroundColor: "#1c1c1e",
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    marginTop: 25,
+  },
+  backButton: {
+    marginRight: 10,
+  },
   title: {
     fontSize: 26,
     fontWeight: 'bold',
     color: '#333',
+  },
+  darktitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#f3f6f4',
   },
   street: {
     fontSize: 18,
@@ -237,6 +254,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 10,
+  },
+  darksectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#f3f6f4',
     marginBottom: 10,
   },
   scooterList: {

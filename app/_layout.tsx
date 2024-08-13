@@ -6,7 +6,7 @@ export default function Layout() {
   const navigation = useNavigation();
 
   useEffect(() => {
-    const handleDeepLink = (event) => {
+    const handleDeepLink = (event: { url: any; }) => {
       try {
         const { url } = event;
         if (url) {
@@ -48,9 +48,10 @@ export default function Layout() {
     <Stack>
       {/* Define your screens here */}
       <Stack.Screen name="(menu)" options={{ headerShown: false }} />
-      <Stack.Screen name="LocationDetails" options={{ headerShown: true, title: 'Детали местности' }} />
+      <Stack.Screen name="LocationDetails" options={{ headerShown: false, title: 'Детали местности' }} />
       <Stack.Screen name="PaymentWebView" options={{ headerShown: true, title: 'Оплата' }} />
       <Stack.Screen name="rentmap" options={{ animation: 'none', headerShown: false }} />
+      <Stack.Screen name="(post)/CreatePost" options={{ headerShown: false, title: 'Сделать пост' }} />
     </Stack>
   );
 }

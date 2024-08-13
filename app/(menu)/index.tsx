@@ -6,8 +6,9 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import WelcomeScreen from "@/components/WelcomeScreen";
-import { FontAwesome, Ionicons } from "@expo/vector-icons";  // Import Ionicons
+import { FontAwesome, Ionicons } from "@expo/vector-icons";  
 import LoadingAnimation from "@/components/LoadingAnimation";
+import { useColorScheme } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -17,7 +18,9 @@ export default function Index() {
     const [isFirstLaunch, setIsFirstLaunch] = useState(true);
     const [loadingAppleSignIn, setLoadingAppleSignIn] = useState(false); 
     const [coins, setCoins] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);  // New state for managing the loading phase
+    const [isLoading, setIsLoading] = useState(true);
+
+    const colorScheme = useColorScheme(); // Получаем текущую цветовую схему
 
     const [request, response, promptAsync] = Google.useAuthRequest({
         androidClientId: "264256222540-or7nbototcrpji70jlmag9semhklg942.apps.googleusercontent.com",
@@ -38,7 +41,7 @@ export default function Index() {
     useEffect(() => {
         const timer = setTimeout(() => {
             setIsLoading(false);
-        }, 2000); // Show loading animation for 3 seconds
+        }, 2000); 
 
         return () => clearTimeout(timer);
     }, []);
@@ -147,7 +150,7 @@ export default function Index() {
             <View style={styles.loadingContainer}>
                 <LoadingAnimation />
             </View>
-        );  // Show loading animation first
+        );  
     }
 
     if (isFirstLaunch) {
@@ -155,15 +158,15 @@ export default function Index() {
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.coinContainer}>
-                <Ionicons name="star" size={24} color="#4285F4" />
-                <Text style={styles.coinText}>{coins}</Text>
+        <SafeAreaView style={[styles.container, colorScheme === 'dark' && styles.darkContainer]}>
+            <View style={[styles.coinContainer, colorScheme === 'dark' && styles.darkCoinContainer]}>
+                <Ionicons name="star" size={24} color={colorScheme === 'dark' ? "#fff" : "#4285F4"} />
+                <Text style={[styles.coinText, colorScheme === 'dark' && styles.darkCoinText]}>{coins}</Text>
             </View>
             {!userInfo ? (
-                <View style={styles.card}>
-                    <Text style={styles.text}>У вас нет аккаунта</Text>
-                    <Text style={styles.text}>Пожалуйста, пройдите регистрацию через сервисы прикрепленные ниже:</Text>
+                <View style={[styles.card, colorScheme === 'dark' && styles.darkCard]}>
+                    <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>У вас нет аккаунта</Text>
+                    <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Пожалуйста, пройдите регистрацию через сервисы прикрепленные ниже:</Text>
                     <TouchableOpacity
                         style={styles.googleButton}
                         disabled={!request}
@@ -185,30 +188,30 @@ export default function Index() {
                     <Button title="Сбросить первый запуск" onPress={resetFirstLaunch} />
                 </View>
             ) : (
-                <View style={styles.card}>
+                <View style={[styles.card, colorScheme === 'dark' && styles.darkCard]}>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         {userInfo?.picture && <Image source={{ uri: userInfo?.picture }} style={styles.image} />}
-                        <Text style={styles.text}>{userInfo.name}</Text>
+                        <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>{userInfo.name}</Text>
                     </View>
-                    <Text style={styles.text}>Почта: {userInfo.email}</Text>
-                    <Text style={styles.text}>
+                    <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Почта: {userInfo.email}</Text>
+                    <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>
                         Верификация: {userInfo.verified_email ? "верифицирован" : "не верифицирован"}
                     </Text>
+
+                    <TouchableOpacity
+                        style={styles.button}
+                        onPress={() => router.push("/CreatePost")}>
+                        <Text style={styles.buttonText}>Выложить пост</Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.button}
                         onPress={async () => {
                             await AsyncStorage.removeItem("@user");
                             setUserInfo(null);
-                            setCoins(0); // Reset coin count
+                            setCoins(0); 
                         }}>
                         <Text style={styles.buttonText}>Выйти из аккаунта</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => router.push("/CreatePost")}>
-                        <Text style={styles.buttonText}>Сделать пост</Text>
                     </TouchableOpacity>
                 </View>
             )}
@@ -217,139 +220,147 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  text: {
-    fontSize: 18,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  card: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    marginHorizontal: 20,
-    marginTop: 50,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
+    container: {
+      flex: 1,
+      backgroundColor: "#f4f7fa",
+      paddingHorizontal: 20,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  image: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 12,
-  },
-  googleButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#DB4437",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 20,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  googleIcon: {
-    marginRight: 12,
-  },
-  googleButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  appleButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#000",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 20,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  appleIcon: {
-    marginRight: 12,
-  },
-  appleButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  button: {
-    backgroundColor: "#4285F4",
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    marginTop: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-  },
-  coinContainer: {
-    position: "absolute",
-    top: 35,
-    left: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#4285F4",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  coinText: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginLeft: 8,
-    color: "#4285F4",
-  },
-  coinIcon: {
-    width: 24,
-    height: 24,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff', // Solid background color
-  },
-});
-
+    darkContainer: {
+      backgroundColor: "#1c1c1e",
+    },
+    text: {
+      fontSize: 20,
+      fontWeight: "600",
+      color: "#333",
+      textAlign: "center",
+      marginBottom: 15,
+    },
+    darkText: {
+      color: "#fff",
+    },
+    card: {
+      flex: 1,
+      backgroundColor: "#fff",
+      borderRadius: 16,
+      paddingHorizontal: 25,
+      paddingVertical: 35,
+      marginHorizontal: 15,
+      marginTop: 60,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 7,
+    },
+    darkCard: {
+      backgroundColor: "#2c2c2e",
+    },
+    image: {
+      width: 80,
+      height: 80,
+      borderRadius: 45,
+      marginRight: 14,
+      marginBottom: 10,
+    },
+    googleButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#ea4335",
+      paddingVertical: 16,
+      borderRadius: 12,
+      marginTop: 25,
+      shadowColor: "#ea4335",
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 5,
+    },
+    googleIcon: {
+      marginRight: 14,
+    },
+    googleButtonText: {
+      color: "#fff",
+      fontSize: 17,
+      fontWeight: "bold",
+    },
+    appleButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#000",
+      paddingVertical: 16,
+      borderRadius: 12,
+      marginTop: 25,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 5,
+    },
+    appleIcon: {
+      marginRight: 14,
+    },
+    appleButtonText: {
+      color: "#fff",
+      fontSize: 17,
+      fontWeight: "bold",
+    },
+    button: {
+      backgroundColor: "#1a73e8",
+      borderRadius: 12,
+      paddingVertical: 16,
+      marginTop: 15,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#1a73e8",
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 5,
+    },
+    buttonText: {
+      color: "#fff",
+      fontSize: 17,
+      fontWeight: "bold",
+    },
+    coinContainer: {
+      position: "absolute",
+      top: 40,
+      left: 15,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#fff",
+      padding: 12,
+      borderRadius: 15,
+      borderWidth: 1.5,
+      borderColor: "#1a73e8",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 7,
+    },
+    darkCoinContainer: {
+      backgroundColor: "#2c2c2e",
+      borderColor: "#fff",
+    },
+    coinText: {
+      fontSize: 20,
+      fontWeight: "600",
+      marginLeft: 10,
+      color: "#1a73e8",
+    },
+    darkCoinText: {
+      color: "#fff",
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "#f4f7fa",
+    },
+    darkLoadingContainer: {
+      backgroundColor: "#1c1c1e",
+    },
+  });

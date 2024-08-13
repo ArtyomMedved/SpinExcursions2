@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, Text, Image, Alert, Button } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity, Text, Image, Alert, Button, SafeAreaView } from 'react-native';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 import Modal from 'react-native-modal';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons'; // Можно использовать любую библиотеку иконок, например, Ionicons
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -132,31 +134,36 @@ const MapScreen = () => {
       id: 1,
       coordinate: { latitude: 54.599060, longitude: 52.447626 },
       title: 'Площадь Ленина',
-      street: 'Улица: площадь Ленина, Лениногорск, Республика Татарстан'
+      street: 'Улица: площадь Ленина, Лениногорск, Республика Татарстан',
+      scooters: ['0001', '0002', '0003', '0004'],
     },
     {
       id: 2,
       coordinate: { latitude: 54.596539, longitude: 52.454104 },
       title: 'Парк Юбилейный',
-      street: 'Республика Татарстан, Лениногорск, парк Юбилейный'
+      street: 'Республика Татарстан, Лениногорск, парк Юбилейный',
+      scooters: ['0005', '0006', '0007', '0008'],
     },
     {
       id: 3,
       coordinate: { latitude: 54.606076, longitude: 52.454188 },
       title: 'Лагуна',
-      street: 'Республика Татарстан, Лениногорск, улица Булгакова'
+      street: 'Республика Татарстан, Лениногорск, улица Булгакова',
+      scooters: ['0009', '0010', '0011', '0012'],
     },
     {
       id: 4,
       coordinate: { latitude: 54.606720, longitude: 52.461817 },
       title: 'Парк Мэхэббэт',
-      street: 'Республика Татарстан, Лениногорск, парк Мэхэббэт'
+      street: 'Республика Татарстан, Лениногорск, парк Мэхэббэт',
+      scooters: ['0013', '0014', '0015', '0016'],
     },
     {
       id: 5,
       coordinate: { latitude: 54.596377, longitude: 52.434611 },
       title: '37-й квартал',
-      street: '37-й квартал, Лениногорск, Республика Татарстан'
+      street: '37-й квартал, Лениногорск, Республика Татарстан',
+      scooters: ['0017', '0018', '0019', '0020'],
     }
   ];
 
@@ -171,11 +178,11 @@ const MapScreen = () => {
 
   if (!isUserRegistered) {
     return (
-      <View style={styles.notRegisteredContainer}>
+      <SafeAreaView style={styles.notRegisteredContainer}>
         <Text style={styles.notRegisteredText}>У вас нет аккаунта</Text>
         <Text style={styles.notRegisteredText}>Пожалуйста, пройдите регистрацию</Text>
         <Button title='Обновить' onPress={checkUserRegistration} />
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -231,13 +238,13 @@ const MapScreen = () => {
           }}
         />
       </MapView>
-        <TouchableOpacity style={styles.locationButton} onPress={goToCurrentLocation}>
-        <Text style={styles.locationButtonText}>Где я?</Text>
+      <TouchableOpacity style={styles.locationButton} onPress={goToCurrentLocation}>
+        <MaterialIcons name="my-location" size={24} color="#1a73e8" />
       </TouchableOpacity>
       {weather && (
         <View style={styles.weatherContainer}>
           <Text style={styles.weatherText}>{weather.name}</Text>
-          <Text style={styles.weatherText}>{weather ? `${weather.main.temp}°C` : 'Загрузка...'}</Text>
+          <Text style={styles.weatherText}>{weather ? `${Math.round(weather.main.temp)}°C` : 'Загрузка...'}</Text>
           <Image
             source={{
               uri: `https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`,
@@ -247,7 +254,7 @@ const MapScreen = () => {
         </View>
       )}
       <TouchableOpacity style={styles.mapTypePickerButton} onPress={toggleMapTypeModal}>
-        <Text style={styles.mapTypePickerButtonText}>Выбрать тип карты</Text>
+        <Ionicons name="map" size={32} color="#1a73e8" />
       </TouchableOpacity>
       <Modal isVisible={isMapTypeModalVisible} onBackdropPress={toggleMapTypeModal}>
         <View style={styles.mapTypeModal}>
@@ -294,14 +301,9 @@ const styles = StyleSheet.create({
   locationButton: {
     position: 'absolute',
     bottom: 10,
-    right: 0,
-    backgroundColor: 'blue',
+    right: 10,
     padding: 10,
-    borderRadius: 20,
-  },
-  locationButtonText: {
-    color: 'white',
-    fontSize: 16,
+    zIndex: 1000,
   },
   weatherContainer: {
     position: 'absolute',
@@ -358,19 +360,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 40,
     left: 10,
-    backgroundColor: 'blue',
-    borderRadius: 10,
     padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
     zIndex: 1000,
   },
   mapTypePickerButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
     marginBottom: 5,
   },
   mapTypeModal: {

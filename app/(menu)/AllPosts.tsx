@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, Image, StyleSheet, SafeAreaView, ActivityIndicator, Text, Button } from 'react-native';
+import { View, FlatList, Image, StyleSheet, SafeAreaView, ActivityIndicator, Text, Button, useColorScheme } from 'react-native';
 import { Card, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -33,7 +33,7 @@ const Post = ({ post, onLike, onDislike }) => {
         <Card.Actions style={styles.postActions}>
           <IconButton
             icon="thumb-up"
-            color={post.liked ? 'blue' : 'grey'}
+            color={post.liked ? '#32a852' : 'grey'} // Bright green for liked
             size={24}
             onPress={handleLike}
             disabled={post.liked || post.loading}
@@ -41,13 +41,13 @@ const Post = ({ post, onLike, onDislike }) => {
           <Text>{post.likes}</Text>
           <IconButton
             icon="thumb-down"
-            color={post.disliked ? 'red' : 'grey'}
+            color={post.disliked ? '#ff3e4d' : 'grey'} // Red for disliked
             size={24}
             onPress={handleDislike}
             disabled={post.disliked || post.loading}
           />
           <Text>{post.dislikes}</Text>
-          {post.loading && <ActivityIndicator size="small" color="#0000ff" />}
+          {post.loading && <ActivityIndicator size="small" color="#32a852" />}
         </Card.Actions>
       </View>
     </Card>
@@ -60,6 +60,8 @@ const AllPostsScreen = () => {
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [dislikedPosts, setDislikedPosts] = useState(new Set());
   const [isUserRegistered, setIsUserRegistered] = useState(false);
+
+  const colorScheme = useColorScheme(); // Получаем текущую цветовую схему
 
   useEffect(() => {
     (async () => {
@@ -151,23 +153,27 @@ const AllPostsScreen = () => {
   if (!isUserRegistered) {
     return (
       <View style={styles.notRegisteredContainer}>
-        <Text style={styles.notRegisteredText}>У вас нет аккаунта</Text>
-        <Text style={styles.notRegisteredText}>Пожалуйста, пройдите регистрацию</Text>
-        <Button title='Обновить' onPress={checkUserRegistration} />
+        <Text style={[styles.notRegisteredText, { color: colorScheme === 'dark' ? '#ffffff' : '#004d4d' }]}>
+          У вас нет аккаунта
+        </Text>
+        <Text style={[styles.notRegisteredText, { color: colorScheme === 'dark' ? '#ffffff' : '#004d4d' }]}>
+          Пожалуйста, пройдите регистрацию
+        </Text>
+        <Button title='Обновить' onPress={checkUserRegistration} color='#32a852' />
       </View>
     );
   }
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#0000ff" />
+      <SafeAreaView style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#121212' : '#e6f7ff' }]}>
+        <ActivityIndicator size="large" color="#32a852" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#121212' : '#e6f7ff' }]}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id?.toString()}
@@ -192,51 +198,58 @@ const getLocalUser = async () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   post: {
+    alignSelf: 'center', 
     marginBottom: 20,
-    borderRadius: 10,
+    borderRadius: 15,
     overflow: 'visible',
-    elevation: 2,
-    width: '100%',
+    elevation: 3,
+    width: '95%',
+    backgroundColor: '#ffffff',
   },
   cardContentWrapper: {
     overflow: 'hidden',
-    borderRadius: 10,
+    borderRadius: 15,
   },
   postImage: {
     width: '100%',
     height: undefined,
     aspectRatio: 1,
     resizeMode: 'cover',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 5,
     marginBottom: 10,
   },
   userImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    marginRight: 12,
   },
   userInfoText: {
     flexDirection: 'column',
   },
   userName: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
+    color: '#004d4d',
   },
   userEmail: {
-    color: 'grey',
+    color: '#808080',
+    fontSize: 14,
   },
   postText: {
     marginBottom: 10,
     fontSize: 16,
+    color: '#003333',
   },
   postActions: {
     flexDirection: 'row',

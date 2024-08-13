@@ -9,6 +9,7 @@ import MapViewDirections from 'react-native-maps-directions';
 import uuid from 'uuid-js';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SECRET_KEY = 'test_AuJsuu_1Akmyg3Vzy7DCq-ob_jhDlAR-jqiIZep0ViY';
 const SHOP_ID = '401474';
@@ -212,8 +213,12 @@ const MapScreen = () => {
       const response = await axios.get(
         `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric`
       );
+  
+      // Проверьте, что данные приходят
+      console.log(response.data);
+  
       setWeather(response.data);
-
+  
       if (response.data.weather && response.data.weather.length > 0) {
         const iconCode = response.data.weather[0].icon;
         const iconUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
@@ -224,6 +229,12 @@ const MapScreen = () => {
       Alert.alert('Error', 'Failed to fetch weather data. Please check your API key.');
     }
   };
+
+  useEffect(() => {
+    if (location) {
+      fetchWeather(location.coords.latitude, location.coords.longitude);
+    }
+  }, [location]);  
 
   const toggleModal = () => {
     setModalVisible(!isModalVisible);
@@ -299,18 +310,22 @@ const MapScreen = () => {
 
   const confirmFinishTrip = async () => {
     setShowConfirmation(false);
+  
     try {
+      const paymentMethodId = await AsyncStorage.getItem('@paymentMethodId');
+  
+      if (!paymentMethodId) {
+        throw new Error('No saved payment method');
+      }
+  
       const idempotenceKey = uuid.create().toString();
-
+  
       const response = await axios.post('https://api.yookassa.ru/v3/payments', {
         amount: {
           value: earnings.toString(),
           currency: 'RUB',
         },
-        confirmation: {
-          type: 'redirect',
-          return_url: 'spinexapp://home',
-        },
+        payment_method_id: paymentMethodId,
         capture: true,
         description: 'Оплата поездки',
       }, {
@@ -323,18 +338,16 @@ const MapScreen = () => {
           password: SECRET_KEY,
         },
       });
-
+  
       console.log('Payment response:', response.data);
-      const paymentUrl = response.data.confirmation.confirmation_url;
-
-      navigation.push('PaymentWebView', { url: paymentUrl });
-
+      Alert.alert('Success', 'Payment completed successfully');
+      navigation.push('(menu)');
     } catch (error) {
       console.error('Payment Error', error);
       Alert.alert('Payment Error', 'Failed to complete payment. Please try again.');
     }
   };
-
+  
   const cancelFinishTrip = () => {
     setShowConfirmation(false);
   };
@@ -401,9 +414,14 @@ const MapScreen = () => {
   
       {weather && (
         <View style={styles.weatherContainer}>
-          <Text style={styles.weatherText}>{`${weather.main.temp}°C`}</Text>
-          {weatherIcon && <Image source={{ uri: weatherIcon }} style={styles.weatherIcon} />}
-          <Text style={styles.weatherText}>{weather.weather[0].description}</Text>
+          <Text style={styles.weatherText}>{weather.name}</Text>
+          <Text style={styles.weatherText}>{weather ? `${Math.round(weather.main.temp)}°C` : 'Загрузка...'}</Text>
+          <Image
+            source={{
+              uri: `https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`,
+            }}
+            style={styles.weatherIcon}
+          />
         </View>
       )}
   
