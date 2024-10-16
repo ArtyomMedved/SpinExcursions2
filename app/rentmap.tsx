@@ -10,6 +10,7 @@ import uuid from 'uuid-js';
 import { FontAwesome6 } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LeninogorskMap from '@/components/Leninogorskmap';
 
 const SECRET_KEY = 'test_AuJsuu_1Akmyg3Vzy7DCq-ob_jhDlAR-jqiIZep0ViY';
 const SHOP_ID = '401474';
@@ -45,7 +46,8 @@ const MapScreen = () => {
     { label: 'Спутник', value: 'satellite' },
   ]);
   const [isNavigating, setIsNavigating] = useState(false);
-
+  const [isFollowingUser, setIsFollowingUser] = useState(true); // This will be true by default to initially follow the user
+  const [userLocation, setUserLocation] = useState(null);
   const navigation = useNavigation();
   const mapRef = useRef(null);
 
@@ -132,24 +134,20 @@ const MapScreen = () => {
           setErrorMsg('Permission to access location was denied');
           return;
         }
-
+  
         let location = await Location.getCurrentPositionAsync({});
-        setLocation(location);
-
-        Location.watchPositionAsync(
+        setUserLocation(location);
+  
+        // Отслеживание изменения местоположения без перемещения карты
+        await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
             timeInterval: 1000,
             distanceInterval: 1,
           },
           (newLocation) => {
-            setLocation(newLocation);
-            if (isNavigating && newLocation.coords.latitude && newLocation.coords.longitude) {
-              setOrigin({
-                latitude: newLocation.coords.latitude,
-                longitude: newLocation.coords.longitude,
-              });
-            }
+            setUserLocation(newLocation); // Обновление местоположения без перемещения карты
+            fetchWeather(newLocation.coords.latitude, newLocation.coords.longitude); // Обновляем данные о погоде
           }
         );
       } catch (error) {
@@ -157,16 +155,16 @@ const MapScreen = () => {
         setErrorMsg('Error while requesting location permissions or getting location');
       }
     })();
-  }, []);
+  }, []);  
 
   useEffect(() => {
-    if (location) {
+    if (userLocation) {
       setOrigin({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
+        latitude: userLocation.coords.latitude,
+        longitude: userLocation.coords.longitude,
       });
     }
-  }, [location]);
+  }, [userLocation]); // Обновляем origin, когда userLocation меняется
 
   useEffect(() => {
     if (errorMsg) {
@@ -250,59 +248,62 @@ const MapScreen = () => {
   };
 
   const goToCurrentLocation = () => {
-    if (location && mapRef.current) {
+    if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion(
         {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
+          latitude: userLocation.coords.latitude,
+          longitude: userLocation.coords.longitude,
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LONGITUDE_DELTA,
         },
-        5000
+        400
       );
+    } else {
+      Alert.alert('Ошибка', 'Не удалось получить текущее местоположение.');
     }
   };
+  
 
   const generatePedestrianRoute = async () => {
-    if (!location) {
-      Alert.alert('Location Error', 'Could not determine your current location.');
-      return;
+    if (!userLocation) {
+        Alert.alert('Location Error', 'Could not determine your current location.');
+        return;
     }
 
     const randomAttraction = attractions[Math.floor(Math.random() * attractions.length)];
     const { latitude, longitude } = randomAttraction.coordinates;
 
     try {
-      const response = await axios.get(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${location.coords.latitude},${location.coords.longitude}&destination=${latitude},${longitude}&mode=walking&key=${GOOGLE_MAPS_APIKEY}`
-      );
+        const response = await axios.get(
+            `https://maps.googleapis.com/maps/api/directions/json?origin=${userLocation.coords.latitude},${userLocation.coords.longitude}&destination=${latitude},${longitude}&mode=walking&key=${GOOGLE_MAPS_APIKEY}`
+        );
 
-      if (response.data.status === 'OK') {
-        const { routes } = response.data;
-        if (routes.length > 0) {
-          const { legs } = routes[0];
-          const { start_location, end_location, duration } = legs[0];
-          setOrigin({
-            latitude: start_location.lat,
-            longitude: start_location.lng,
-          });
-          setDestination({
-            latitude: end_location.lat,
-            longitude: end_location.lng,
-          });
-          setRouteDuration(duration.text);
-          setIsRouteVisible(true);
+        if (response.data.status === 'OK') {
+            const { routes } = response.data;
+            if (routes.length > 0) {
+                const { legs } = routes[0];
+                const { start_location, end_location, duration } = legs[0];
+                setOrigin({
+                    latitude: start_location.lat,
+                    longitude: start_location.lng,
+                });
+                setDestination({
+                    latitude: end_location.lat,
+                    longitude: end_location.lng,
+                });
+                setRouteDuration(Math.round(duration.value / 60)); // Convert duration to minutes
+                setIsRouteVisible(true);
+            } else {
+                Alert.alert('Route Error', 'No pedestrian route found.');
+            }
         } else {
-          Alert.alert('Route Error', 'No pedestrian route found.');
+            Alert.alert('Route Error', `Failed to fetch pedestrian route: ${response.data.error_message}`);
         }
-      } else {
-          Alert.alert('Route Error', `Failed to fetch pedestrian route: ${response.data.error_message}`);
-      }
     } catch (error) {
-      console.error('Error fetching route data', error);
-      Alert.alert('Error', 'Failed to fetch route data. Please try again.');
+        console.error('Error fetching route data', error);
+        Alert.alert('Error', 'Failed to fetch route data. Please try again.');
     }
-  };
+};
 
   const finishTrip = () => {
     setShowConfirmation(true);
@@ -374,12 +375,13 @@ const MapScreen = () => {
         ref={mapRef}
         style={styles.map}
         region={{
-          latitude: location?.coords.latitude || 37.78825,
-          longitude: location?.coords.longitude || -122.4324,
+          latitude: location?.coords.latitude || 54.59023,
+          longitude: location?.coords.longitude || 52.454026,
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LONGITUDE_DELTA,
         }}
         showsUserLocation={true}
+        onRegionChange={() => setIsFollowingUser(false)} // Disable following when the user manually changes the map region
         zoomEnabled={true}
         scrollEnabled={true}
         pitchEnabled={true}
@@ -387,6 +389,7 @@ const MapScreen = () => {
         mapType={currentMapType}
         showsCompass={true}
       >
+        <LeninogorskMap />
         {attractions.map((attraction, index) => (
           <Marker
             key={index}
@@ -443,7 +446,7 @@ const MapScreen = () => {
   
       <View style={styles.infoContainer}>
         <Text style={styles.infoText}>Время: {formatTime(timer)}</Text>
-        <Text style={styles.infoText}>Заработок: {earnings}₽</Text>
+        <Text style={styles.infoText}>цена: {earnings}₽</Text>
         {routeDuration && <Text style={styles.infoText}>маршрут: {routeDuration} мин.</Text>}
       </View>
   

@@ -60,7 +60,7 @@ export default function LocationDetailsScreen() {
             const user = await AsyncStorage.getItem('@user');
             if (user) {
               const userId = JSON.parse(user).id;
-              await axios.post('https://primate-big-alpaca.ngrok-free.app/save-payment-method', {
+              await axios.post('https://spinexcursions.ru:3000/save-payment-method', {
                 userId,
                 paymentMethodId,
               });
@@ -136,11 +136,11 @@ export default function LocationDetailsScreen() {
         if (user) {
           const userId = JSON.parse(user).id;
 
-          const coinsResponse = await axios.get(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`);
+          const coinsResponse = await axios.get(`https://spinexcursions.ru:3000/coins/${userId}`);
           const currentCoins = coinsResponse.data.coins;
 
           if (currentCoins >= 100) {
-            await axios.post(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`, {
+            await axios.post(`https://spinexcursions.ru:3000/coins/${userId}`, {
               coins: currentCoins - 100
             });
 

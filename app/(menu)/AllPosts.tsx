@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, Image, StyleSheet, SafeAreaView, ActivityIndicator, Text, Button, useColorScheme } from 'react-native';
+import { View, FlatList, Image, StyleSheet, SafeAreaView, ActivityIndicator, Text, Button, useColorScheme, RefreshControl } from 'react-native';
 import { Card, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FontAwesome, Ionicons } from "@expo/vector-icons"; 
+import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
 
 const Post = ({ post, onLike, onDislike }) => {
   const handleLike = () => {
-    if (!post.liked && !post.loading) {
-      onLike(post.id);
+    if (!post.loading) {
+      onLike(post.id, post.liked, post.disliked); // Передаем текущие статусы
     }
   };
 
   const handleDislike = () => {
-    if (!post.disliked && !post.loading) {
-      onDislike(post.id);
+    if (!post.loading) {
+      onDislike(post.id, post.liked, post.disliked); // Передаем текущие статусы
     }
   };
 
@@ -33,18 +35,18 @@ const Post = ({ post, onLike, onDislike }) => {
         <Card.Actions style={styles.postActions}>
           <IconButton
             icon="thumb-up"
-            color={post.liked ? '#32a852' : 'grey'} // Bright green for liked
+            color={post.liked ? '#32a852' : 'grey'}
             size={24}
             onPress={handleLike}
-            disabled={post.liked || post.loading}
+            disabled={post.loading}
           />
           <Text>{post.likes}</Text>
           <IconButton
             icon="thumb-down"
-            color={post.disliked ? '#ff3e4d' : 'grey'} // Red for disliked
+            color={post.disliked ? '#ff3e4d' : 'grey'}
             size={24}
             onPress={handleDislike}
-            disabled={post.disliked || post.loading}
+            disabled={post.loading}
           />
           <Text>{post.dislikes}</Text>
           {post.loading && <ActivityIndicator size="small" color="#32a852" />}
@@ -54,14 +56,24 @@ const Post = ({ post, onLike, onDislike }) => {
   );
 };
 
+
 const AllPostsScreen = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [dislikedPosts, setDislikedPosts] = useState(new Set());
   const [isUserRegistered, setIsUserRegistered] = useState(false);
-
+  const [isConnected, setIsConnected] = useState(true);
   const colorScheme = useColorScheme(); // Получаем текущую цветовую схему
+
+  useEffect(() => {
+    // Проверка подключения к интернету
+    const unsubscribe = NetInfo.addEventListener(state => {
+        setIsConnected(state.isConnected);
+    });
+
+    return () => unsubscribe();
+}, []);
 
   useEffect(() => {
     (async () => {
@@ -72,12 +84,17 @@ const AllPostsScreen = () => {
   useEffect(() => {
     const loadPosts = async () => {
       try {
-        const response = await fetch('https://primate-big-alpaca.ngrok-free.app/posts');
+        setLoading(true);
+        const response = await fetch('https://spinexcursions.ru:3000/posts');
         if (!response.ok) {
           throw new Error('Failed to fetch posts');
         }
         const data = await response.json();
-        setPosts(data.map(post => ({
+        
+        // Сортировка постов от нового к старому
+        const sortedPosts = data.sort((a, b) => b.id - a.id);  // Сортировка от нового к старому
+        
+        setPosts(sortedPosts.map(post => ({
           ...post,
           liked: likedPosts.has(post.id),
           disliked: dislikedPosts.has(post.id),
@@ -89,9 +106,10 @@ const AllPostsScreen = () => {
         setLoading(false);
       }
     };
-
+  
     loadPosts();
   }, [likedPosts, dislikedPosts]);
+  
 
   const checkUserRegistration = async () => {
     const user = await getLocalUser();
@@ -106,7 +124,7 @@ const AllPostsScreen = () => {
         )
       );
 
-      const response = await fetch(`https://primate-big-alpaca.ngrok-free.app/posts/${postId}/like`, {
+      const response = await fetch(`https://spinexcursions.ru:3000/posts/${postId}/like`, {
         method: 'POST',
       });
       if (!response.ok) {
@@ -132,7 +150,7 @@ const AllPostsScreen = () => {
         )
       );
 
-      const response = await fetch(`https://primate-big-alpaca.ngrok-free.app/posts/${postId}/dislike`, {
+      const response = await fetch(`https://spinexcursions.ru:3000/posts/${postId}/dislike`, {
         method: 'POST',
       });
       if (!response.ok) {
@@ -149,6 +167,18 @@ const AllPostsScreen = () => {
       );
     }
   };
+
+  if (!isConnected) {
+    return (
+        <SafeAreaView style={[styles.container1, colorScheme === 'dark' && styles.darkContainer]}>
+            <View style={[styles.noInternetContainer, colorScheme === 'dark' && styles.darkCard]}>
+                <Ionicons name="wifi" size={80} color={colorScheme === 'dark' ? "#fff" : "#1a73e8"} />
+                <Text style={[styles.noInternetText, colorScheme === 'dark' && styles.darkText]}>Нет доступа к интернету</Text>
+                <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Проверьте подключение и попробуйте снова</Text>
+            </View>
+        </SafeAreaView>
+    );
+}
 
   if (!isUserRegistered) {
     return (
@@ -265,6 +295,63 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
   },
+  container1: {
+    flex: 1,
+    backgroundColor: "#f4f7fa",
+    paddingHorizontal: 20,
+  },
+  darkContainer: {
+    backgroundColor: "#1c1c1e",
+  },
+  text: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  darkText: {
+    color: "#fff",
+  },
+  card: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 25,
+    paddingVertical: 35,
+    marginHorizontal: 15,
+    marginTop: 60,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 7,
+  },
+  darkCard: {
+    backgroundColor: "#2c2c2e",
+  },
+  noInternetContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 25,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 7,
+    backgroundColor: "#fff",
+    marginTop: 60,
+    paddingVertical: 35,
+    marginHorizontal: 15,
+},
+noInternetText: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 20,
+    color: "#1a73e8",
+}
 });
 
 export default AllPostsScreen;

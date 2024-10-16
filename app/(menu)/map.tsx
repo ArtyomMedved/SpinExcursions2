@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions, TouchableOpacity, Text, Image, Alert, Button, SafeAreaView } from 'react-native';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import MapView, { Marker, UrlTile, Polygon } from 'react-native-maps';
 import Modal from 'react-native-modal';
 import * as Location from 'expo-location';
 import axios from 'axios';
@@ -8,6 +8,9 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons'; // Можно использовать любую библиотеку иконок, например, Ionicons
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useColorScheme } from 'react-native';
+import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
+import LeninogorskMap from '@/components/Leninogorskmap';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -32,6 +35,9 @@ const MapScreen = () => {
   const [isMapTypeModalVisible, setMapTypeModalVisible] = useState(false);
   const navigation = useNavigation();
   const mapRef = useRef(null);
+  const colorScheme = useColorScheme(); // Получаем текущую цветовую схему
+  const [userLocation, setUserLocation] = useState(null);
+  const [isConnected, setIsConnected] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -40,94 +46,114 @@ const MapScreen = () => {
   }, []);
 
   useEffect(() => {
-    if (location) {
-      fetchWeather(location.coords.latitude, location.coords.longitude);
-    }
-  }, [location]);
-
-  useEffect(() => {
-    if (errorMsg) {
-      Alert.alert('Location Error', errorMsg);
-    }
-  }, [errorMsg]);
-
-  const checkUserRegistration = async () => {
-    const user = await getLocalUser();
-    setIsUserRegistered(!!user);
-    if (!user) return;
-
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMsg('Permission to access location was denied');
-        return;
-      }
-
-      let location = await Location.getCurrentPositionAsync({});
-      setLocation(location);
-
-      Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 1000,
-          distanceInterval: 1,
-        },
-        (newLocation) => {
-          setLocation(newLocation);
-        }
-      );
-    } catch (error) {
-      console.error('Error while requesting location permissions or getting location', error);
-      setErrorMsg('Error while requesting location permissions or getting location');
-    }
-  };
-
-  const fetchWeather = async (latitude, longitude) => {
-    try {
-      const response = await axios.get(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric`
-      );
-      setWeather(response.data);
-    } catch (error) {
-      console.error('Error fetching weather data', error);
-      Alert.alert('Error', 'Failed to fetch weather data. Please check your API key.');
-    }
-  };
-
-  const toggleModal = () => {
-    setModalVisible(!isModalVisible);
-  };
-
-  const handleMarkerPress = (location) => {
-    setSelectedLocation(location);
-    toggleModal();
-  };
-
-  const handleModalPress = () => {
-    toggleModal();
-    navigation.navigate('LocationDetails', {
-      title: selectedLocation.title,
-      street: selectedLocation.street,
+    // Проверка подключения к интернету
+    const unsubscribe = NetInfo.addEventListener(state => {
+        setIsConnected(state.isConnected);
     });
-  };
 
-  const goToCurrentLocation = () => {
-    if (location && mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: LATITUDE_DELTA,
-          longitudeDelta: LONGITUDE_DELTA,
-        },
-        1000
-      );
+    return () => unsubscribe();
+}, []);
+
+
+  // Обработка ошибок местоположения
+useEffect(() => {
+  if (errorMsg) {
+    Alert.alert('Location Error', errorMsg);
+  }
+}, [errorMsg]);
+
+// Функция для проверки регистрации пользователя и начала отслеживания местоположения
+const checkUserRegistration = async () => {
+  const user = await getLocalUser();
+  setIsUserRegistered(!!user);
+  if (!user) return;
+
+  try {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setErrorMsg('Permission to access location was denied');
+      return;
     }
-  };
 
-  const onMapTypeChange = (value) => {
-    setCurrentMapType(value);
-  };
+    let location = await Location.getCurrentPositionAsync({});
+    setUserLocation(location); // Устанавливаем начальное местоположение пользователя
+    // Отслеживаем изменения местоположения без перемещения карты
+    await Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.High,
+        timeInterval: 5000,
+        distanceInterval: 1,
+      },
+      (newLocation) => {
+        setUserLocation(newLocation); // Обновляем состояние userLocation без перемещения карты
+        fetchWeather(newLocation.coords.latitude, newLocation.coords.longitude); // Обновляем данные о погоде
+      }
+    );
+
+  } catch (error) {
+    console.error('Error while requesting location permissions or getting location', error);
+    setErrorMsg('Error while requesting location permissions or getting location');
+  }
+};
+
+// Функция для получения погоды
+const fetchWeather = async (latitude, longitude) => {
+  try {
+    const response = await axios.get(
+      `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric`
+    );
+    setWeather(response.data);
+  } catch (error) {
+    console.error('Error fetching weather data', error);
+  }
+};
+
+// Функция для переключения модального окна
+const toggleModal = () => {
+  setModalVisible(!isModalVisible);
+};
+
+// Обработка нажатия на маркер
+const handleMarkerPress = (location) => {
+  setSelectedLocation(location);
+  toggleModal();
+};
+
+// Обработка нажатия на модальное окно
+const handleModalPress = () => {
+  toggleModal();
+  navigation.navigate('LocationDetails', {
+    title: selectedLocation.title,
+    street: selectedLocation.street,
+  });
+};
+
+// Функция для перемещения карты к текущему местоположению пользователя
+const goToCurrentLocation = () => {
+  if (userLocation && mapRef.current) {
+    mapRef.current.animateToRegion(
+      {
+        latitude: userLocation.coords.latitude,
+        longitude: userLocation.coords.longitude,
+        latitudeDelta: LATITUDE_DELTA,
+        longitudeDelta: LONGITUDE_DELTA,
+      },
+      400 // Анимация перемещения карты
+    );
+  } else {
+    Alert.alert('Ошибка', 'Не удалось получить текущее местоположение.');
+  }
+};
+
+// Функция для изменения типа карты
+const onMapTypeChange = (value) => {
+  setCurrentMapType(value);
+};
+
+// Вызов функции проверки регистрации пользователя и начала отслеживания местоположения
+useEffect(() => {
+  checkUserRegistration();
+}, []);
 
   const markers = [
     {
@@ -135,35 +161,30 @@ const MapScreen = () => {
       coordinate: { latitude: 54.599060, longitude: 52.447626 },
       title: 'Площадь Ленина',
       street: 'Улица: площадь Ленина, Лениногорск, Республика Татарстан',
-      scooters: ['0001', '0002', '0003', '0004'],
     },
     {
       id: 2,
       coordinate: { latitude: 54.596539, longitude: 52.454104 },
       title: 'Парк Юбилейный',
-      street: 'Республика Татарстан, Лениногорск, парк Юбилейный',
-      scooters: ['0005', '0006', '0007', '0008'],
+      street: 'Республика Татарстан, Лениногорск, парк Юбилейный'
     },
     {
       id: 3,
       coordinate: { latitude: 54.606076, longitude: 52.454188 },
       title: 'Лагуна',
       street: 'Республика Татарстан, Лениногорск, улица Булгакова',
-      scooters: ['0009', '0010', '0011', '0012'],
     },
     {
       id: 4,
       coordinate: { latitude: 54.606720, longitude: 52.461817 },
       title: 'Парк Мэхэббэт',
       street: 'Республика Татарстан, Лениногорск, парк Мэхэббэт',
-      scooters: ['0013', '0014', '0015', '0016'],
     },
     {
       id: 5,
-      coordinate: { latitude: 54.596377, longitude: 52.434611 },
-      title: '37-й квартал',
-      street: '37-й квартал, Лениногорск, Республика Татарстан',
-      scooters: ['0017', '0018', '0019', '0020'],
+      coordinate: { latitude: 54.606615, longitude: 52.448493 },
+      title: 'Парк культуры и отдыха имени Горького',
+      street: 'улица Осипенко, Лениногорск, Республика Татарстан',
     }
   ];
 
@@ -175,6 +196,18 @@ const MapScreen = () => {
     setCurrentMapType(value);
     setMapTypeModalVisible(false);
   };
+
+  if (!isConnected) {
+    return (
+        <SafeAreaView style={[styles.container1, colorScheme === 'dark' && styles.darkContainer]}>
+            <View style={[styles.noInternetContainer, colorScheme === 'dark' && styles.darkCard]}>
+                <Ionicons name="wifi" size={80} color={colorScheme === 'dark' ? "#fff" : "#1a73e8"} />
+                <Text style={[styles.noInternetText, colorScheme === 'dark' && styles.darkText]}>Нет доступа к интернету</Text>
+                <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Проверьте подключение и попробуйте снова</Text>
+            </View>
+        </SafeAreaView>
+    );
+}
 
   if (!isUserRegistered) {
     return (
@@ -192,8 +225,8 @@ const MapScreen = () => {
         ref={mapRef}
         style={styles.map}
         region={{
-          latitude: location?.coords.latitude || 37.78825,
-          longitude: location?.coords.longitude || -122.4324,
+          latitude: location?.coords.latitude || 54.59023,
+          longitude: location?.coords.longitude || 52.454026,
           latitudeDelta: LATITUDE_DELTA,
           longitudeDelta: LONGITUDE_DELTA,
         }}
@@ -205,6 +238,7 @@ const MapScreen = () => {
         mapType={currentMapType}
         showsCompass={true}
       >
+        <LeninogorskMap />
         {markers.map((marker) => (
           <Marker
             key={marker.id}
@@ -408,6 +442,63 @@ const styles = StyleSheet.create({
     height: 30,
     resizeMode: 'contain',
   },
+  container1: {
+    flex: 1,
+    backgroundColor: "#f4f7fa",
+    paddingHorizontal: 20,
+  },
+  darkContainer: {
+    backgroundColor: "#1c1c1e",
+  },
+  text: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  darkText: {
+    color: "#fff",
+  },
+  card: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 25,
+    paddingVertical: 35,
+    marginHorizontal: 15,
+    marginTop: 60,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 7,
+  },
+  darkCard: {
+    backgroundColor: "#2c2c2e",
+  },
+  noInternetContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 25,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 7,
+    backgroundColor: "#fff",
+    marginTop: 60,
+    paddingVertical: 35,
+    marginHorizontal: 15,
+},
+noInternetText: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 20,
+    color: "#1a73e8",
+}
 });
 
 export default MapScreen;

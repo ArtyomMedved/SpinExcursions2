@@ -9,6 +9,7 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";  
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { useColorScheme } from 'react-native';
+import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -19,6 +20,7 @@ export default function Index() {
     const [loadingAppleSignIn, setLoadingAppleSignIn] = useState(false); 
     const [coins, setCoins] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [isConnected, setIsConnected] = useState(true);
 
     const colorScheme = useColorScheme(); // Получаем текущую цветовую схему
 
@@ -26,6 +28,15 @@ export default function Index() {
         androidClientId: "264256222540-or7nbototcrpji70jlmag9semhklg942.apps.googleusercontent.com",
         iosClientId: "264256222540-0so4ikl54o31i3og721lvmnfdaamiuq4.apps.googleusercontent.com",
     });
+
+    useEffect(() => {
+        // Проверка подключения к интернету
+        const unsubscribe = NetInfo.addEventListener(state => {
+            setIsConnected(state.isConnected);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
         checkFirstLaunch();
@@ -75,7 +86,7 @@ export default function Index() {
 
     const logRegistration = async (user) => {
         try {
-            await fetch('https://primate-big-alpaca.ngrok-free.app/log-registration', {
+            await fetch('https://spinexcursions.ru:3000/log-registration', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -137,13 +148,34 @@ export default function Index() {
 
     const fetchCoins = async (userId) => {
         try {
-            const response = await fetch(`https://primate-big-alpaca.ngrok-free.app/coins/${userId}`);
+            const response = await fetch(`https://spinexcursions.ru:3000/coins/${userId}`);
             const data = await response.json();
+            
+            // Update the verification status based on the presence of the phone number
+            const verified = data.phone ? "верифицирован" : "не верифицирован";
+            
             setCoins(data.coins);
+            setUserInfo((prevUserInfo) => ({
+                ...prevUserInfo,
+                verified_email: verified
+            }));
         } catch (error) {
             console.error('Error fetching coins:', error);
         }
     };
+    
+
+    if (!isConnected) {
+        return (
+            <SafeAreaView style={[styles.container, colorScheme === 'dark' && styles.darkContainer]}>
+                <View style={[styles.noInternetContainer, colorScheme === 'dark' && styles.darkCard]}>
+                    <Ionicons name="wifi" size={80} color={colorScheme === 'dark' ? "#fff" : "#1a73e8"} />
+                    <Text style={[styles.noInternetText, colorScheme === 'dark' && styles.darkText]}>Нет доступа к интернету</Text>
+                    <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Проверьте подключение и попробуйте снова</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     if (isLoading) {
         return (
@@ -195,8 +227,16 @@ export default function Index() {
                     </View>
                     <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Почта: {userInfo.email}</Text>
                     <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>
-                        Верификация: {userInfo.verified_email ? "верифицирован" : "не верифицирован"}
+                        Верификация: {userInfo.phone_number ? "верифицирован" : "не верифицирован"}
                     </Text>
+                    {!userInfo.phone_number && (
+                        <TouchableOpacity
+                            style={styles.button}
+                            onPress={() => router.push('/Verification')}>
+                            <Text style={styles.buttonText}>Пройти верификацию</Text>
+                        </TouchableOpacity>
+                    )}
+
 
                     <TouchableOpacity
                         style={styles.button}
@@ -326,7 +366,7 @@ const styles = StyleSheet.create({
     },
     coinContainer: {
       position: "absolute",
-      top: 40,
+      top: 30,
       left: 15,
       flexDirection: "row",
       alignItems: "center",
@@ -363,4 +403,26 @@ const styles = StyleSheet.create({
     darkLoadingContainer: {
       backgroundColor: "#1c1c1e",
     },
+    noInternetContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 25,
+        borderRadius: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 7,
+        backgroundColor: "#fff",
+        marginTop: 60,
+        paddingVertical: 35,
+        marginHorizontal: 15,
+    },
+    noInternetText: {
+        fontSize: 24,
+        fontWeight: "700",
+        marginTop: 20,
+        color: "#1a73e8",
+    }
   });
