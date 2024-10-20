@@ -102,7 +102,7 @@ export default function LocationDetailsScreen() {
 
       const response = await axios.post(YOOKASSA_API_URL, {
         amount: {
-          value: '100.00',
+          value: '50.00',
           currency: 'RUB',
         },
         confirmation: {
@@ -127,7 +127,38 @@ export default function LocationDetailsScreen() {
 
       const paymentUrl = response.data.confirmation.confirmation_url;
       const paymentId = response.data.id;
+
       setPaymentId(paymentId);
+
+      const user = await AsyncStorage.getItem('@user');
+    const { email, picture } = user ? JSON.parse(user) : { email: null, picture: null };
+
+    // Отправка данных аренды на сервер
+    try {
+      console.log({
+        scooterImage: "none",
+        rentDescription: `Rent ${title}/${selectedScooter.name}`,
+        userEmail: email,
+        userPicture: picture,
+        rentalValue: '50.00',
+        rentalTime: new Date().toISOString(),
+        paymentId: paymentId,
+      });
+    
+      await axios.post('https://spinexcursions.ru:3000/save-scooter-rental', {
+        scooterImage: "https://spinexcursions.ru:3000/uploads/image-1729428439380-921132855.png",
+        rentDescription: `Rent ${title}/${selectedScooter.name}`,
+        userEmail: email,
+        userPicture: picture,
+        rentalValue: '50.00',
+        rentalTime: new Date().toISOString(),
+        paymentId: paymentId,
+      });
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      Alert.alert('Error', 'Failed to create payment');
+    }
+    
 
       setModalVisible(false);
 

@@ -3,18 +3,18 @@ import { View, FlatList, Image, StyleSheet, SafeAreaView, ActivityIndicator, Tex
 import { Card, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome, Ionicons } from "@expo/vector-icons"; 
-import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
+import NetInfo from '@react-native-community/netinfo';
 
 const Post = ({ post, onLike, onDislike }) => {
   const handleLike = () => {
-    if (!post.loading) {
-      onLike(post.id, post.liked, post.disliked); // Передаем текущие статусы
+    if (!post.loading && !post.liked) {
+      onLike(post.id);
     }
   };
 
   const handleDislike = () => {
-    if (!post.loading) {
-      onDislike(post.id, post.liked, post.disliked); // Передаем текущие статусы
+    if (!post.loading && !post.disliked) {
+      onDislike(post.id);
     }
   };
 
@@ -38,7 +38,7 @@ const Post = ({ post, onLike, onDislike }) => {
             color={post.liked ? '#32a852' : 'grey'}
             size={24}
             onPress={handleLike}
-            disabled={post.loading}
+            disabled={post.loading || post.disliked} // блокируем лайк, если дизлайк уже поставлен
           />
           <Text>{post.likes}</Text>
           <IconButton
@@ -46,7 +46,7 @@ const Post = ({ post, onLike, onDislike }) => {
             color={post.disliked ? '#ff3e4d' : 'grey'}
             size={24}
             onPress={handleDislike}
-            disabled={post.loading}
+            disabled={post.loading || post.liked} // блокируем дизлайк, если лайк уже поставлен
           />
           <Text>{post.dislikes}</Text>
           {post.loading && <ActivityIndicator size="small" color="#32a852" />}
@@ -56,24 +56,20 @@ const Post = ({ post, onLike, onDislike }) => {
   );
 };
 
-
 const AllPostsScreen = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [likedPosts, setLikedPosts] = useState(new Set());
-  const [dislikedPosts, setDislikedPosts] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false); // Добавлено состояние для обновления
   const [isUserRegistered, setIsUserRegistered] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
-  const colorScheme = useColorScheme(); // Получаем текущую цветовую схему
+  const colorScheme = useColorScheme();
 
   useEffect(() => {
-    // Проверка подключения к интернету
     const unsubscribe = NetInfo.addEventListener(state => {
-        setIsConnected(state.isConnected);
+      setIsConnected(state.isConnected);
     });
-
     return () => unsubscribe();
-}, []);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -82,33 +78,67 @@ const AllPostsScreen = () => {
   }, []);
 
   useEffect(() => {
-    const loadPosts = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('https://spinexcursions.ru:3000/posts');
-        if (!response.ok) {
-          throw new Error('Failed to fetch posts');
-        }
-        const data = await response.json();
-        
-        // Сортировка постов от нового к старому
-        const sortedPosts = data.sort((a, b) => b.id - a.id);  // Сортировка от нового к старому
-        
-        setPosts(sortedPosts.map(post => ({
-          ...post,
-          liked: likedPosts.has(post.id),
-          disliked: dislikedPosts.has(post.id),
-          loading: false,
-        })));
-        setLoading(false);
-      } catch (error) {
-        console.error('Failed to load posts', error);
-        setLoading(false);
-      }
-    };
-  
     loadPosts();
-  }, [likedPosts, dislikedPosts]);
+  }, []);
+
+  useEffect(() => {
+    const checkRegistration = async () => {
+      await checkUserRegistration();
+    };
+    
+    checkRegistration();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const user = await getLocalUser();
+      if (user) {
+        loadPosts(); // Загружаем посты только если пользователь существует
+      } else {
+        setLoading(false); // Останавливаем загрузку, если пользователя нет
+      }
+    })();
+  }, []);
+  
+
+  const loadPosts = async () => {
+    try {
+      setLoading(true);
+  
+      // Получаем email текущего пользователя
+      const user = await getLocalUser();
+      const userEmail = user ? user.email : null;
+      
+      if (!userEmail) {
+        setLoading(false); // Останавливаем загрузку, если пользователя нет
+        return;
+      }
+  
+      const response = await fetch('https://spinexcursions.ru:3000/posts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch posts');
+      }
+      const data = await response.json();
+      const sortedPosts = data.sort((a, b) => b.id - a.id);
+  
+      // Загружаем информацию о лайках и дизлайках из AsyncStorage для текущего пользователя
+      const likedPosts = JSON.parse(await AsyncStorage.getItem(`@likedPosts_${userEmail}`)) || {};
+      const dislikedPosts = JSON.parse(await AsyncStorage.getItem(`@dislikedPosts_${userEmail}`)) || {};
+      
+      setPosts(sortedPosts.map(post => ({
+        ...post,
+        liked: likedPosts[post.id] || false,
+        disliked: dislikedPosts[post.id] || false,
+        loading: false,
+      })));
+      setLoading(false);
+      setRefreshing(false); // Останавливаем анимацию обновления
+    } catch (error) {
+      console.error('Failed to load posts', error);
+      setLoading(false);
+      setRefreshing(false); // Останавливаем анимацию обновления
+    }
+  };
   
 
   const checkUserRegistration = async () => {
@@ -118,20 +148,41 @@ const AllPostsScreen = () => {
 
   const handleLike = async (postId) => {
     try {
+      // Получаем email текущего пользователя
+      const user = await getLocalUser();
+      const userEmail = user ? user.email : null;
+      if (!userEmail) throw new Error("User not logged in");
+  
       setPosts(prevPosts =>
         prevPosts.map(post =>
           post.id === postId ? { ...post, loading: true } : post
         )
       );
-
+  
       const response = await fetch(`https://spinexcursions.ru:3000/posts/${postId}/like`, {
         method: 'POST',
-      });
+      });      
       if (!response.ok) {
         throw new Error('Failed to like post');
       }
-      const updatedPost = await response.json();
-      setLikedPosts(prevLikedPosts => new Set([...prevLikedPosts, updatedPost.id]));
+  
+      // Сохраняем информацию о лайке в AsyncStorage для текущего пользователя
+      const likedPosts = JSON.parse(await AsyncStorage.getItem(`@likedPosts_${userEmail}`)) || {};
+      likedPosts[postId] = true;
+      await AsyncStorage.setItem(`@likedPosts_${userEmail}`, JSON.stringify(likedPosts));
+  
+      // Обновляем состояние постов
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post.id === postId ? { ...post, liked: true, disliked: false, loading: false } : post
+        )
+      );
+      
+      // Удаляем дизлайк, если он был
+      const dislikedPosts = JSON.parse(await AsyncStorage.getItem(`@dislikedPosts_${userEmail}`)) || {};
+      delete dislikedPosts[postId];
+      await AsyncStorage.setItem(`@dislikedPosts_${userEmail}`, JSON.stringify(dislikedPosts));
+  
     } catch (error) {
       console.error('Error liking post:', error);
       setPosts(prevPosts =>
@@ -144,20 +195,41 @@ const AllPostsScreen = () => {
 
   const handleDislike = async (postId) => {
     try {
+      // Получаем email текущего пользователя
+      const user = await getLocalUser();
+      const userEmail = user ? user.email : null;
+      if (!userEmail) throw new Error("User not logged in");
+  
       setPosts(prevPosts =>
         prevPosts.map(post =>
           post.id === postId ? { ...post, loading: true } : post
         )
       );
-
+  
       const response = await fetch(`https://spinexcursions.ru:3000/posts/${postId}/dislike`, {
         method: 'POST',
       });
       if (!response.ok) {
         throw new Error('Failed to dislike post');
       }
-      const updatedPost = await response.json();
-      setDislikedPosts(prevDislikedPosts => new Set([...prevDislikedPosts, updatedPost.id]));
+  
+      // Сохраняем информацию о дизлайке в AsyncStorage для текущего пользователя
+      const dislikedPosts = JSON.parse(await AsyncStorage.getItem(`@dislikedPosts_${userEmail}`)) || {};
+      dislikedPosts[postId] = true;
+      await AsyncStorage.setItem(`@dislikedPosts_${userEmail}`, JSON.stringify(dislikedPosts));
+  
+      // Обновляем состояние постов
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post.id === postId ? { ...post, disliked: true, liked: false, loading: false } : post
+        )
+      );
+      
+      // Удаляем лайк, если он был
+      const likedPosts = JSON.parse(await AsyncStorage.getItem(`@likedPosts_${userEmail}`)) || {};
+      delete likedPosts[postId];
+      await AsyncStorage.setItem(`@likedPosts_${userEmail}`, JSON.stringify(likedPosts));
+  
     } catch (error) {
       console.error('Error disliking post:', error);
       setPosts(prevPosts =>
@@ -168,59 +240,59 @@ const AllPostsScreen = () => {
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true); // Запускаем анимацию обновления
+    loadPosts(); // Загружаем посты заново
+  };
+
   if (!isConnected) {
     return (
-        <SafeAreaView style={[styles.container1, colorScheme === 'dark' && styles.darkContainer]}>
-            <View style={[styles.noInternetContainer, colorScheme === 'dark' && styles.darkCard]}>
-                <Ionicons name="wifi" size={80} color={colorScheme === 'dark' ? "#fff" : "#1a73e8"} />
-                <Text style={[styles.noInternetText, colorScheme === 'dark' && styles.darkText]}>Нет доступа к интернету</Text>
-                <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Проверьте подключение и попробуйте снова</Text>
-            </View>
-        </SafeAreaView>
-    );
-}
-
-  if (!isUserRegistered) {
-    return (
-      <View style={styles.notRegisteredContainer}>
-        <Text style={[styles.notRegisteredText, { color: colorScheme === 'dark' ? '#ffffff' : '#004d4d' }]}>
-          У вас нет аккаунта
-        </Text>
-        <Text style={[styles.notRegisteredText, { color: colorScheme === 'dark' ? '#ffffff' : '#004d4d' }]}>
-          Пожалуйста, пройдите регистрацию
-        </Text>
-        <Button title='Обновить' onPress={checkUserRegistration} color='#32a852' />
-      </View>
+      <SafeAreaView style={[styles.container1, colorScheme === 'dark' && styles.darkContainer]}>
+        <View style={[styles.noInternetContainer, colorScheme === 'dark' && styles.darkCard]}>
+          <Ionicons name="wifi" size={80} color={colorScheme === 'dark' ? "#fff" : "#1a73e8"} />
+          <Text style={[styles.noInternetText, colorScheme === 'dark' && styles.darkText]}>Нет доступа к интернету</Text>
+          <Text style={[styles.text, colorScheme === 'dark' && styles.darkText]}>Пожалуйста, проверьте ваше интернет-соединение и повторите попытку.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  if (loading) {
+  if (!isUserRegistered) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#121212' : '#e6f7ff' }]}>
-        <ActivityIndicator size="large" color="#32a852" />
+      <SafeAreaView style={styles.notRegisteredContainer}>
+        <Text style={styles.notRegisteredText}>У вас нет аккаунта</Text>
+        <Text style={styles.notRegisteredText}>Пожалуйста, пройдите регистрацию</Text>
+        <Button title='Обновить' onPress={checkUserRegistration} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#121212' : '#e6f7ff' }]}>
-      <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id?.toString()}
-        renderItem={({ item }) => (
-          <Post
-            post={{ ...item, loading: false }}
-            onLike={handleLike}
-            onDislike={handleDislike}
-          />
-        )}
-      />
+    <SafeAreaView style={[styles.container, colorScheme === 'dark' && styles.darkContainer]}>
+      {loading ? (
+        <ActivityIndicator size="large" color="#32a852" />
+      ) : (
+        <FlatList
+          data={posts}
+          renderItem={({ item }) => (
+            <Post
+              post={item}
+              onLike={handleLike}
+              onDislike={handleDislike}
+            />
+          )}
+          keyExtractor={item => item.id.toString()}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> // Добавлен функционал обновления
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
 
 const getLocalUser = async () => {
-  const data = await AsyncStorage.getItem("@user");
+  const data = await AsyncStorage.getItem('@user');
   if (!data) return null;
   return JSON.parse(data);
 };

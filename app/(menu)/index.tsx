@@ -21,6 +21,8 @@ export default function Index() {
     const [coins, setCoins] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [isConnected, setIsConnected] = useState(true);
+    const [verifiedStatus, setVerifiedStatus] = useState("не верифицирован");
+
 
     const colorScheme = useColorScheme(); // Получаем текущую цветовую схему
 
@@ -150,19 +152,15 @@ export default function Index() {
         try {
             const response = await fetch(`https://spinexcursions.ru:3000/coins/${userId}`);
             const data = await response.json();
-            
-            // Update the verification status based on the presence of the phone number
+    
             const verified = data.phone ? "верифицирован" : "не верифицирован";
-            
             setCoins(data.coins);
-            setUserInfo((prevUserInfo) => ({
-                ...prevUserInfo,
-                verified_email: verified
-            }));
+            setVerifiedStatus(verified); // Установить статус верификации
         } catch (error) {
             console.error('Error fetching coins:', error);
         }
     };
+    
     
 
     if (!isConnected) {
@@ -247,12 +245,15 @@ export default function Index() {
                     <TouchableOpacity
                         style={styles.button}
                         onPress={async () => {
+                           // Очистка локального хранилища и состояния
                             await AsyncStorage.removeItem("@user");
                             setUserInfo(null);
-                            setCoins(0); 
+                            setCoins(0);  // Сброс монет
+                            setVerifiedStatus("не верифицирован"); // Сброс верификации
                         }}>
                         <Text style={styles.buttonText}>Выйти из аккаунта</Text>
                     </TouchableOpacity>
+
                 </View>
             )}
         </SafeAreaView>
@@ -366,7 +367,7 @@ const styles = StyleSheet.create({
     },
     coinContainer: {
       position: "absolute",
-      top: 30,
+      top: 35,
       left: 15,
       flexDirection: "row",
       alignItems: "center",

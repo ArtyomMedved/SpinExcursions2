@@ -76,14 +76,15 @@ const LeninogorskMap = () => {
       >
         <Polygon
           coordinates={boundaryCoordinates}
-          strokeColor="blue" // Граница синего цвета
-          fillColor="rgba(135, 206, 250, 0.13)" // Полупрозрачный синий
-          strokeWidth={3}
+          strokeColor="#1E90FF" // Граница яркого синего цвета
+          fillColor="rgba(30, 144, 255, 0.1)" // Полупрозрачный синий для заливки
+          strokeWidth={1}
         />
       </MapView>
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {

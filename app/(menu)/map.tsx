@@ -273,7 +273,7 @@ useEffect(() => {
         />
       </MapView>
       <TouchableOpacity style={styles.locationButton} onPress={goToCurrentLocation}>
-        <MaterialIcons name="my-location" size={24} color="#1a73e8" />
+        <MaterialIcons name="my-location" size={24} color="#FFFFFF" />
       </TouchableOpacity>
       {weather && (
         <View style={styles.weatherContainer}>
@@ -288,7 +288,7 @@ useEffect(() => {
         </View>
       )}
       <TouchableOpacity style={styles.mapTypePickerButton} onPress={toggleMapTypeModal}>
-        <Ionicons name="map" size={32} color="#1a73e8" />
+        <Ionicons name="map" size={32} color="#FFFFFF" />
       </TouchableOpacity>
       <Modal isVisible={isMapTypeModalVisible} onBackdropPress={toggleMapTypeModal}>
         <View style={styles.mapTypeModal}>

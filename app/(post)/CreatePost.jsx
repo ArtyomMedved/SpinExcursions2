@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Image, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Image, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, useColorScheme } from 'react-native';
 import { Text, TextInput, Button } from 'react-native-paper';
 import { launchImageLibrary } from 'react-native-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,6 +13,7 @@ const CreatePostScreen = () => {
   const [updateTrigger, setUpdateTrigger] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const router = useRouter();
+  const colorScheme = useColorScheme();
 
   const addPost = async () => {
     if (newPostText.trim() || selectedImage) {
@@ -78,27 +79,37 @@ const CreatePostScreen = () => {
     }
   }, [updateTrigger]);
 
+  const isDarkMode = colorScheme === 'dark';
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Кнопка "Назад" */}
-      <Appbar.BackAction onPress={() => router.back()} style={styles.backButton} />
+    <SafeAreaView style={[styles.container, isDarkMode && styles.darkContainer]}>
+      {/* Кнопка "Назад" с проверкой на темный режим */}
+      <Appbar.BackAction 
+        onPress={() => router.back()} 
+        style={styles.backButton} 
+        color={isDarkMode ? "#fff" : "#000"} // Цвет иконки меняется в зависимости от темы
+      />
 
       <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: 16 }}>
-        <View style={styles.postContainer}>
-          {/* Заголовок внутри контейнера */}
-          <Text style={styles.title}>Выложить пост</Text>
+        <View style={[styles.postContainer, isDarkMode && styles.darkPostContainer]}>
+          <Text style={[styles.title, isDarkMode && styles.darkTitle]}>Выложить пост</Text>
           
           <TextInput
             mode="flat"
             placeholder="Опишите ваш пост"
             value={newPostText}
             onChangeText={setNewPostText}
-            style={styles.input}
+            style={[styles.input, isDarkMode && styles.darkInput]}
+            placeholderTextColor={isDarkMode ? "#ccc" : "#666"} 
             multiline
             numberOfLines={5}
+            theme={{
+              colors: {
+                text: isDarkMode ? '#fff' : '#000' // Цвет введенного текста
+              }
+            }}
           />
 
-          {/* Изображение отображается здесь */}
           {imageLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#32a852" />
@@ -134,8 +145,11 @@ const CreatePostScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#e6f7ff', // Light blue background
-    paddingHorizontal: 20,
+    backgroundColor: "#f4f7fa",
+    paddingHorizontal: 10,
+  },
+  darkContainer: {
+    backgroundColor: "#1c1c1e",
   },
   backButton: {
     alignSelf: 'flex-start',
@@ -143,68 +157,90 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   postContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 15, // Rounded corners for the container
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-    marginBottom: 20,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 25,
+    paddingVertical: 35,
+    marginHorizontal: 15,
+    marginTop: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 7,
+  },
+  darkPostContainer: {
+    backgroundColor: "#2c2c2e",
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  darkTitle: {
+    color: "#fff",
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginBottom: 20,
     paddingHorizontal: 16,
     paddingVertical: 1,
     borderRadius: 12,
-    borderColor: '#ccc',
+    borderColor: "#ccc",
     borderWidth: 1,
     fontSize: 14,
   },
+  darkInput: {
+    backgroundColor: "#3a3a3c",
+    color: "#FFFFFF",
+    borderColor: "#666",
+  },
   imagePickerButton: {
-    backgroundColor: '#1a73e8',
-    borderRadius: 15, // Rounded corners
-    paddingVertical: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: "center",
+    backgroundColor: "#1a73e8",
+    paddingVertical: 10,
+    borderRadius: 12,
     marginBottom: 20,
+    shadowColor: "#1a73e8",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
   imagePickerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "bold",
   },
   selectedImage: {
     width: '100%',
     height: 250,
     marginBottom: 20,
-    borderRadius: 15, // Rounded corners for the image
+    borderRadius: 15,
   },
   addButton: {
-    backgroundColor: '#32a852', // Bright green button
-    borderRadius: 15, // Rounded corners
-    paddingVertical: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#32a852",
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#32a852",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
   addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "bold",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
