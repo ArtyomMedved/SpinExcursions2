@@ -4,8 +4,42 @@ import { Card, IconButton } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome, Ionicons } from "@expo/vector-icons"; 
 import NetInfo from '@react-native-community/netinfo';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 const Post = ({ post, onLike, onDislike }) => {
+  const [permissionStatus, requestPermission] = MediaLibrary.usePermissions();
+
+  // Функция для сохранения изображения на устройство
+  const handleSaveImage = async () => {
+    if (!post.image) return;
+    
+    try {
+      // Запрашиваем разрешение на доступ к медиа
+      if (permissionStatus?.status !== 'granted') {
+        const permissionResponse = await requestPermission();
+        if (permissionResponse.status !== 'granted') {
+          alert("Необходимо разрешение для сохранения изображений.");
+          return;
+        }
+      }
+
+      const fileUri = FileSystem.cacheDirectory + 'temp_image.jpg';
+      
+      // Скачиваем изображение в кэш
+      const { uri } = await FileSystem.downloadAsync(post.image, fileUri);
+
+      // Сохраняем изображение в галерею устройства
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync('Download', asset, false);
+      
+      alert("Изображение успешно сохранено в галерею!");
+    } catch (error) {
+      console.error("Ошибка при сохранении изображения:", error);
+      alert("Не удалось сохранить изображение.");
+    }
+  };
+
   const handleLike = () => {
     if (!post.loading && !post.liked) {
       onLike(post.id);
@@ -50,6 +84,14 @@ const Post = ({ post, onLike, onDislike }) => {
           />
           <Text>{post.dislikes}</Text>
           {post.loading && <ActivityIndicator size="small" color="#32a852" />}
+          {/* Кнопка сохранения изображения */}
+          {post.image && (
+            <IconButton
+            icon={() => <FontAwesome name="save" size={24} color="grey" />} // Иконка сохранения
+            onPress={handleSaveImage}
+            disabled={post.loading} // Отключаем кнопку при загрузке
+            />
+          )}
         </Card.Actions>
       </View>
     </Card>
