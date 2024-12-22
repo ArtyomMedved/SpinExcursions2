@@ -406,7 +406,7 @@ const MapScreen = () => {
             apikey={GOOGLE_MAPS_APIKEY}
             strokeWidth={4}
             strokeColor="blue"
-            mode="DRIVING"
+            mode="WALKING" // Изменение режима на пешеходный
             onReady={(result) => {
               const roundedDuration = Math.round(result.duration);
               setRouteDuration(roundedDuration);

@@ -10,6 +10,7 @@ import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import LoadingAnimation from "@/components/LoadingAnimation";
 import { useColorScheme } from 'react-native';
 import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
+import PushNotification from 'react-native-push-notification';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -30,6 +31,8 @@ export default function Index() {
         androidClientId: "264256222540-or7nbototcrpji70jlmag9semhklg942.apps.googleusercontent.com",
         iosClientId: "264256222540-0so4ikl54o31i3og721lvmnfdaamiuq4.apps.googleusercontent.com",
     });
+
+    
 
     useEffect(() => {
         // Проверка подключения к интернету
@@ -160,8 +163,33 @@ export default function Index() {
             console.error('Error fetching coins:', error);
         }
     };
-    
-    
+
+    // Функция для отвязки карт
+const handleUnlinkCards = () => {
+    // Показываем диалог с подтверждением
+    Alert.alert(
+      "Подтверждение",
+      "Вы уверены, что хотите отвязать все карты?",
+      [
+        {
+          text: "Отмена",
+          style: "cancel"
+        },
+        {
+          text: "Да", onPress: () => {
+            // Выполнить действие по отвязке всех карт
+            // Пример: запрос на сервер для отвязки всех карт
+  
+            // Показываем уведомление об успешном удалении карт
+            PushNotification.localNotification({
+              title: "Успешно!",
+              message: "Все карты были удалены",
+            });
+          }
+        }
+      ]
+    );
+  };
 
     if (!isConnected) {
         return (
@@ -253,6 +281,13 @@ export default function Index() {
                         }}>
                         <Text style={styles.buttonText}>Выйти из аккаунта</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+  style={styles.button}
+  onPress={handleUnlinkCards}>
+  <Text style={styles.buttonText}>Отвязать все карты</Text>
+</TouchableOpacity>
+
 
                 </View>
             )}

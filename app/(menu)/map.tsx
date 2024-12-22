@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons'; // Можно использов�
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useColorScheme } from 'react-native';
 import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
-import LeninogorskMap from '@/components/Leninogorskmap';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -238,7 +237,6 @@ useEffect(() => {
         mapType={currentMapType}
         showsCompass={true}
       >
-        <LeninogorskMap />
         {markers.map((marker) => (
           <Marker
             key={marker.id}
